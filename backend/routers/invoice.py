@@ -1,0 +1,182 @@
+"""
+Invoice routes with calculation logic.
+"""
+
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, status, Query
+from beanie import PydanticObjectId
+
+from middleware.auth_middleware import get_current_user, get_current_org, org_filter
+from middleware.rbac import require_module_read, require_module_write, require_module_full
+from models.user import User
+from models.organization import Organization
+from models.invoice import Invoice, LineItem
+from schemas.invoice import InvoiceCreate, InvoiceUpdate, InvoiceResponse, MarkPaidRequest
+from schemas.common import SuccessResponse, PaginatedResponse
+from utils.helpers import paginate_params, build_paginated_response, build_sort_params, generate_invoice_number, utc_now
+from services.audit_service import log_action
+from datetime import datetime
+
+router = APIRouter(prefix="/api/v1/invoices", tags=["Invoices"])
+
+
+@router.post("", response_model=SuccessResponse)
+async def create_invoice(
+    data: InvoiceCreate,
+    current_user: User = Depends(require_module_write("invoices")),
+    org: Optional[Organization] = Depends(get_current_org)
+):
+    year = datetime.now().year
+    
+    # Simple auto-increment for sequence
+    count = await Invoice.find(org_filter(org, {"invoice_number": {"$regex": f"^INV-{year}-"}})).count()
+    inv_number = generate_invoice_number(year, count + 1)
+    
+    invoice = Invoice(
+        org_id=org.id if org else None,
+        created_by=current_user.id,
+        invoice_number=inv_number,
+        **data.model_dump(exclude={"contact_id", "company_id", "line_items"})
+    )
+    if data.contact_id: invoice.contact_id = PydanticObjectId(data.contact_id)
+    if data.company_id: invoice.company_id = PydanticObjectId(data.company_id)
+    
+    invoice.line_items = [LineItem(**item.model_dump()) for item in data.line_items]
+    invoice.calculate_totals()
+
+    await invoice.insert()
+    await log_action(str(org.id) if org else "super_admin", str(current_user.id), "create", "invoices", str(invoice.id))
+    
+    return SuccessResponse(data={"id": str(invoice.id), "invoice_number": inv_number}, message="Invoice created successfully")
+
+
+@router.get("", response_model=PaginatedResponse)
+async def list_invoices(
+    page: int = Query(1, ge=1),
+    per_page: int = Query(20, ge=1, le=100),
+    sort_by: str = Query("created_at"),
+    sort_order: str = Query("desc"),
+    search: Optional[str] = None,
+    status: Optional[str] = None,
+    current_user: User = Depends(require_module_read("invoices")),
+    org: Optional[Organization] = Depends(get_current_org)
+):
+    skip, limit = paginate_params(page, per_page)
+    sort = build_sort_params(sort_by, sort_order)
+    
+    query = org_filter(org)
+    if search:
+        query["invoice_number"] = {"$regex": search, "$options": "i"}
+    if status:
+        query["status"] = status
+        
+    cursor = Invoice.find(query).sort(sort).skip(skip).limit(limit)
+    items = await cursor.to_list()
+    total = await Invoice.find(query).count()
+    
+    data = []
+    for item in items:
+        d = item.model_dump()
+        d["id"] = str(d.pop("_id", item.id))
+        if d.get("contact_id"): d["contact_id"] = str(d["contact_id"])
+        if d.get("company_id"): d["company_id"] = str(d["company_id"])
+        data.append(d)
+        
+    response_data = build_paginated_response(data, total, page, per_page)
+    return PaginatedResponse(**response_data)
+
+
+@router.get("/{invoice_id}", response_model=SuccessResponse)
+async def get_invoice(
+    invoice_id: str,
+    current_user: User = Depends(require_module_read("invoices")),
+    org: Optional[Organization] = Depends(get_current_org)
+):
+    invoice = await Invoice.find_one(org_filter(org, {"_id": PydanticObjectId(invoice_id)}))
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+        
+    d = invoice.model_dump()
+    d["id"] = str(d.pop("_id", invoice.id))
+    if d.get("contact_id"): d["contact_id"] = str(d["contact_id"])
+    if d.get("company_id"): d["company_id"] = str(d["company_id"])
+        
+    return SuccessResponse(data=d)
+
+
+@router.put("/{invoice_id}", response_model=SuccessResponse)
+async def update_invoice(
+    invoice_id: str,
+    data: InvoiceUpdate,
+    current_user: User = Depends(require_module_write("invoices")),
+    org: Optional[Organization] = Depends(get_current_org)
+):
+    invoice = await Invoice.find_one(org_filter(org, {"_id": PydanticObjectId(invoice_id)}))
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+        
+    update_data = data.model_dump(exclude_unset=True, exclude={"line_items"})
+    if "contact_id" in update_data:
+        update_data["contact_id"] = PydanticObjectId(update_data["contact_id"]) if update_data["contact_id"] else None
+    if "company_id" in update_data:
+        update_data["company_id"] = PydanticObjectId(update_data["company_id"]) if update_data["company_id"] else None
+        
+    for k, v in update_data.items():
+        setattr(invoice, k, v)
+        
+    if data.line_items is not None:
+        invoice.line_items = [LineItem(**item.model_dump()) for item in data.line_items]
+        
+    invoice.calculate_totals()
+        
+    invoice.updated_by = current_user.id
+    invoice.updated_at = utc_now()
+    await invoice.save()
+    
+    await log_action(str(org.id) if org else "super_admin", str(current_user.id), "update", "invoices", str(invoice.id))
+    
+    return SuccessResponse(message="Invoice updated successfully")
+
+
+@router.put("/{invoice_id}/mark-paid", response_model=SuccessResponse)
+async def mark_invoice_paid(
+    invoice_id: str,
+    data: MarkPaidRequest,
+    current_user: User = Depends(require_module_write("invoices")),
+    org: Optional[Organization] = Depends(get_current_org)
+):
+    invoice = await Invoice.find_one(org_filter(org, {"_id": PydanticObjectId(invoice_id)}))
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+        
+    invoice.status = "paid"
+    invoice.payment_date = data.payment_date or utc_now()
+    invoice.payment_method = data.payment_method
+    
+    invoice.updated_by = current_user.id
+    invoice.updated_at = utc_now()
+    await invoice.save()
+    
+    await log_action(str(org.id) if org else "super_admin", str(current_user.id), "update", "invoices", str(invoice.id), changes={"status": "paid"})
+    
+    return SuccessResponse(message="Invoice marked as paid")
+
+
+@router.delete("/{invoice_id}", response_model=SuccessResponse)
+async def delete_invoice(
+    invoice_id: str,
+    current_user: User = Depends(require_module_write("invoices")),
+    org: Optional[Organization] = Depends(get_current_org)
+):
+    invoice = await Invoice.find_one(org_filter(org, {"_id": PydanticObjectId(invoice_id)}))
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+        
+    invoice.is_deleted = True
+    invoice.deleted_at = utc_now()
+    invoice.deleted_by = current_user.id
+    await invoice.save()
+    
+    await log_action(str(org.id) if org else "super_admin", str(current_user.id), "delete", "invoices", str(invoice.id))
+    
+    return SuccessResponse(message="Invoice deleted successfully")

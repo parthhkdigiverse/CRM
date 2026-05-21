@@ -27,6 +27,7 @@ from models.document import DocumentModel
 from models.target import Target
 from models.payroll import Payroll
 from models.leave import Leave
+from models.chat import ChatRoom, ChatMessage
 
 _client: AsyncIOMotorClient = None
 
@@ -52,6 +53,8 @@ ALL_MODELS = [
     Target,
     Payroll,
     Leave,
+    ChatRoom,
+    ChatMessage,
 ]
 
 

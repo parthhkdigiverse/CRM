@@ -35,6 +35,7 @@ import Targets from './pages/Targets';
 // New Pages
 import AccessDenied from './pages/AccessDenied';
 import AdminPanel from './pages/AdminPanel';
+import Chat from './pages/Chat';
 
 const ProtectedRoute = ({ children, requireOrg = false }: { children: React.ReactNode, requireOrg?: boolean }) => {
   const { isAuthenticated, user, organization, isLoading } = useAuthStore();
@@ -178,6 +179,7 @@ function App() {
             {/* Common Routes */}
             <Route path="contacts" element={<Contacts />} />
             <Route path="companies" element={<Companies />} />
+            <Route path="chat" element={<Chat />} />
             <Route path="projects" element={<Projects />} />
             <Route path="tasks" element={<Tasks />} />
             <Route path="attendance" element={<Attendance />} />

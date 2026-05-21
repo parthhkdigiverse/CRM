@@ -17,7 +17,8 @@ import {
   CreditCard,
   Folder,
   FileText,
-  ShieldAlert
+  ShieldAlert,
+  MessageSquare
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -58,6 +59,7 @@ const navigation = [
   {
     title: 'PEOPLE',
     items: [
+      { name: 'Messages', href: '/chat', icon: MessageSquare, isComingSoon: false, allowedRoles: ['super_admin', 'admin', 'hr', 'employee'] },
       { name: 'HRMS', href: '/employees', icon: Users, isComingSoon: false, allowedRoles: ['super_admin', 'admin', 'hr'] },
       { name: 'Attendance', href: '/attendance', icon: Clock, isComingSoon: false, allowedRoles: ['super_admin', 'admin', 'hr', 'employee'] },
       { name: 'Leaves', href: '/leaves', icon: CalendarDays, isComingSoon: false, allowedRoles: ['super_admin', 'admin', 'hr', 'employee'] },

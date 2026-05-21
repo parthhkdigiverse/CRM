@@ -20,6 +20,9 @@ import {
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
+import { useAuthStore } from '@/store/authStore';
+import EntityActivityLog from '@/components/EntityActivityLog';
+
 import { apiClient } from '@/lib/axios';
 import FormDrawer, { FormField, ChipSelect, inputClass, selectClass, textareaClass } from '@/components/FormDrawer';
 import MoreDetails from '@/components/MoreDetails';
@@ -42,6 +45,9 @@ const categoryColors: Record<string, string> = {
 };
 
 export default function Tasks() {
+  const { user } = useAuthStore();
+  const isEmployee = user?.role === 'employee';
+
   const [tasks, setTasks] = useState<any[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -109,22 +115,29 @@ export default function Tasks() {
   // Submit task creation or update
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) {
+    if (!isEmployee && !title.trim()) {
       toast.error('Title is required');
       return;
     }
 
     try {
       setSubmitLoading(true);
-      const payload = {
-        title,
-        description,
-        priority,
-        status,
-        linked_type: category, // Using linked_type to store Department Category
-        due_date: dueDate ? new Date(dueDate).toISOString() : null,
-        assigned_to: assignedTo || null
-      };
+      
+      let payload: any;
+      if (isEmployee && selectedTask) {
+        // Employees can only update status
+        payload = { status };
+      } else {
+        payload = {
+          title,
+          description,
+          priority,
+          status,
+          linked_type: category,
+          due_date: dueDate ? new Date(dueDate).toISOString() : null,
+          assigned_to: assignedTo || null
+        };
+      }
 
       if (selectedTask) {
         await apiClient.put(`/tasks/${selectedTask.id}`, payload);
@@ -245,12 +258,14 @@ export default function Tasks() {
               className="pl-9 rounded-xl border-gray-200 dark:border-gray-800 h-9 bg-white dark:bg-gray-950 shadow-sm" 
             />
           </div>
-          <Button 
-            onClick={() => openDialog(null, 'todo')}
-            className="bg-purple-600 hover:bg-purple-700 text-white rounded-xl h-9 px-4 active:scale-95 transition-all shadow-sm font-medium"
-          >
-            <Plus className="h-4 w-4 mr-2" /> New Task
-          </Button>
+          {!isEmployee && (
+            <Button 
+              onClick={() => openDialog(null, 'todo')}
+              className="bg-purple-600 hover:bg-purple-700 text-white rounded-xl h-9 px-4 active:scale-95 transition-all shadow-sm font-medium"
+            >
+              <Plus className="h-4 w-4 mr-2" /> New Task
+            </Button>
+          )}
         </div>
       </div>
 
@@ -284,12 +299,14 @@ export default function Tasks() {
                       {colTasks.length}
                     </span>
                   </div>
-                  <button 
-                    onClick={() => openDialog(null, col.id)}
-                    className="h-6 w-6 rounded-md hover:bg-gray-200/50 dark:hover:bg-gray-800/50 flex items-center justify-center text-gray-400 hover:text-gray-700 transition-colors"
-                  >
-                    <Plus className="h-4 w-4" />
-                  </button>
+                  {!isEmployee && (
+                    <button 
+                      onClick={() => openDialog(null, col.id)}
+                      className="h-6 w-6 rounded-md hover:bg-gray-200/50 dark:hover:bg-gray-800/50 flex items-center justify-center text-gray-400 hover:text-gray-700 transition-colors"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </button>
+                  )}
                 </div>
 
                 {/* Column Card Stack */}
@@ -313,15 +330,17 @@ export default function Tasks() {
                           className="bg-white dark:bg-gray-950 border border-gray-100 dark:border-gray-900 rounded-xl p-4 shadow-[0_2px_8px_-3px_rgba(0,0,0,0.05)] hover:shadow-md cursor-pointer hover:border-purple-200 dark:hover:border-purple-900 transition-all duration-200 group relative"
                         >
                           {/* Hover Actions */}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDelete(task.id);
-                            }}
-                            className="absolute top-3 right-3 h-6 w-6 rounded-md hover:bg-rose-50 dark:hover:bg-rose-950/30 flex items-center justify-center text-gray-300 group-hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all duration-150"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
+                          {!isEmployee && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(task.id);
+                              }}
+                              className="absolute top-3 right-3 h-6 w-6 rounded-md hover:bg-rose-50 dark:hover:bg-rose-950/30 flex items-center justify-center text-gray-300 group-hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all duration-150"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          )}
 
                           {/* Card Tags */}
                           <div className="flex items-center gap-1.5 flex-wrap">
@@ -403,11 +422,11 @@ export default function Tasks() {
       >
         {/* Visible Fields */}
         <FormField label="Task Title" required>
-          <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Design new landing page" className={inputClass} autoFocus />
+          <Input value={title} onChange={(e) => setTitle(e.target.value)} disabled={isEmployee} placeholder="e.g. Design new landing page" className={inputClass} autoFocus={!isEmployee} />
         </FormField>
 
         <FormField label="Assigned To">
-          <select value={assignedTo} onChange={(e) => setAssignedTo(e.target.value)} className={selectClass}>
+          <select value={assignedTo} onChange={(e) => setAssignedTo(e.target.value)} disabled={isEmployee} className={selectClass}>
             <option value="">Unassigned</option>
             {employees.map((emp) => (
               <option key={emp.id} value={emp.id}>{emp.name} ({emp.role})</option>
@@ -416,20 +435,22 @@ export default function Tasks() {
         </FormField>
 
         <FormField label="Due Date">
-          <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className={inputClass} />
+          <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} disabled={isEmployee} className={inputClass} />
         </FormField>
 
         <FormField label="Priority">
-          <ChipSelect
-            options={[
-              { value: 'low', label: 'Low' },
-              { value: 'medium', label: 'Medium' },
-              { value: 'high', label: 'High' },
-              { value: 'urgent', label: 'Urgent' },
-            ]}
-            value={priority}
-            onChange={setPriority}
-          />
+          <div className={isEmployee ? 'opacity-60 pointer-events-none' : ''}>
+            <ChipSelect
+              options={[
+                { value: 'low', label: 'Low' },
+                { value: 'medium', label: 'Medium' },
+                { value: 'high', label: 'High' },
+                { value: 'urgent', label: 'Urgent' },
+              ]}
+              value={priority}
+              onChange={setPriority}
+            />
+          </div>
         </FormField>
 
         <FormField label="Status">
@@ -448,11 +469,11 @@ export default function Tasks() {
         {/* More Details */}
         <MoreDetails>
           <FormField label="Description">
-            <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Task details..." rows={3} className={textareaClass} />
+            <textarea value={description} onChange={(e) => setDescription(e.target.value)} disabled={isEmployee} placeholder="Task details..." rows={3} className={textareaClass} />
           </FormField>
 
           <FormField label="Category">
-            <select value={category} onChange={(e) => setCategory(e.target.value)} className={selectClass}>
+            <select value={category} onChange={(e) => setCategory(e.target.value)} disabled={isEmployee} className={selectClass}>
               <option value="Design">Design</option>
               <option value="Marketing">Marketing</option>
               <option value="Legal">Legal</option>
@@ -465,9 +486,10 @@ export default function Tasks() {
           </FormField>
         </MoreDetails>
 
+
         {/* Delete for existing tasks */}
-        {selectedTask && (
-          <div className="border-t border-gray-100 dark:border-gray-800 pt-3 mt-2">
+        {!isEmployee && selectedTask && (
+          <div className="border-t border-gray-100 dark:border-gray-800 pt-3 mt-6">
             <Button type="button" variant="ghost" size="sm" className="text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20" onClick={() => { handleDelete(selectedTask.id); setDialogOpen(false); }}>
               <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Delete Task
             </Button>

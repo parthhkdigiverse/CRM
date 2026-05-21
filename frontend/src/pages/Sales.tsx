@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { formatINR, formatINRCompact } from '@/lib/currency';
 import { Button } from '@/components/ui/button';
 import { 
   ShoppingCart,
@@ -35,10 +36,10 @@ const trendData = [
 ];
 
 const leaderboard = [
-  { name: 'Parth Devani', sales: '₹2,45,000', count: 12, rank: 1, avatar: 'PD' },
-  { name: 'Ananya Sharma', sales: '₹1,90,000', count: 9, rank: 2, avatar: 'AS' },
-  { name: 'Rohan Mehta', sales: '₹1,50,000', count: 8, rank: 3, avatar: 'RM' },
-  { name: 'Sneha Patel', sales: '₹95,000', count: 5, rank: 4, avatar: 'SP' },
+  { name: 'Parth Devani', sales: 245000, count: 12, rank: 1, avatar: 'PD' },
+  { name: 'Ananya Sharma', sales: 190000, count: 9, rank: 2, avatar: 'AS' },
+  { name: 'Rohan Mehta', sales: 150000, count: 8, rank: 3, avatar: 'RM' },
+  { name: 'Sneha Patel', sales: 95000, count: 5, rank: 4, avatar: 'SP' },
 ];
 
 export default function Sales() {
@@ -65,7 +66,7 @@ export default function Sales() {
           <CardContent className="p-5 flex justify-between items-start">
             <div className="space-y-2">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Today's Sales</p>
-              <div className="text-3xl font-bold">₹0</div>
+              <div className="text-3xl font-bold">{formatINR(0)}</div>
               <p className="text-xs font-medium text-gray-500 flex items-center">
                 <TrendingUp className="h-3 w-3 mr-1" /> 0% vs last month
               </p>
@@ -137,9 +138,9 @@ export default function Sales() {
               <LineChart data={trendData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" className="dark:stroke-gray-800" />
                 <XAxis dataKey="date" stroke="#9ca3af" fontSize={11} tickLine={false} axisLine={false} />
-                <YAxis stroke="#9ca3af" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(val) => `₹${val/1000}K`} />
+                <YAxis stroke="#9ca3af" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(val) => formatINRCompact(val)} />
                 <Tooltip 
-                  formatter={(value: any) => [`₹${value.toLocaleString()}`, 'Sales']}
+                  formatter={(value: any) => [formatINR(value), 'Sales']}
                   contentStyle={{ 
                     backgroundColor: 'rgba(255, 255, 255, 0.8)', 
                     border: 'none', 
@@ -180,7 +181,7 @@ export default function Sales() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <span className="font-bold text-sm text-purple-600 dark:text-purple-400">{person.sales}</span>
+                    <span className="font-bold text-sm text-purple-600 dark:text-purple-400">{formatINR(person.sales)}</span>
                   </div>
                 </div>
               ))}

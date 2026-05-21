@@ -185,6 +185,8 @@ async def update_lead(
     if not lead:
         raise HTTPException(status_code=404, detail="Lead not found")
         
+    old_status = lead.status
+    
     update_data = data.model_dump(exclude_unset=True)
     if "assigned_to" in update_data:
         if update_data["assigned_to"]:
@@ -201,6 +203,49 @@ async def update_lead(
         
     for k, v in update_data.items():
         setattr(lead, k, v)
+        
+    new_status = lead.status
+    
+    if old_status != "converted" and new_status == "converted":
+        import time
+        company_name = lead.company if lead.company else lead.name
+        existing_company = await Company.find_one({"name": company_name, "org_id": lead.org_id, "is_deleted": False})
+        if not existing_company:
+            new_company = Company(
+                name=company_name,
+                email=lead.email,
+                phone=lead.phone,
+                assigned_to=lead.assigned_to,
+                org_id=lead.org_id,
+                created_by=current_user.id
+            )
+            await new_company.insert()
+            
+        project_code = f"P-{int(time.time())}"
+        new_project = Project(
+            project_code=project_code,
+            title=f"Project: {company_name}",
+            client_name=company_name,
+            status="planning",
+            budget=lead.value,
+            assignee_ids=[lead.assigned_to] if lead.assigned_to else [],
+            org_id=lead.org_id,
+            created_by=current_user.id
+        )
+        await new_project.insert()
+        
+    elif old_status == "converted" and new_status != "converted":
+        company_name = lead.company if lead.company else lead.name
+        projects = await Project.find(
+            Project.org_id == lead.org_id,
+            Project.client_name == company_name,
+            Project.is_deleted == False
+        ).to_list()
+        for p in projects:
+            p.is_deleted = True
+            p.deleted_at = utc_now()
+            p.deleted_by = current_user.id
+            await p.save()
         
     new_score = calculate_lead_score(lead)
     if new_score != lead.score:

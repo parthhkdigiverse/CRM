@@ -23,6 +23,7 @@ import Invoices from './pages/Invoices';
 import Tasks from './pages/Tasks';
 import Employees from './pages/Employees';
 import Attendance from './pages/Attendance';
+import Leaves from './pages/Leaves';
 import Projects from './pages/Projects';
 import Calendar from './pages/Calendar';
 import Documents from './pages/Documents';
@@ -180,6 +181,7 @@ function App() {
             <Route path="projects" element={<Projects />} />
             <Route path="tasks" element={<Tasks />} />
             <Route path="attendance" element={<Attendance />} />
+            <Route path="leaves" element={<Leaves />} />
             <Route path="targets" element={<Targets />} />
             <Route path="ai" element={<AIAssistant />} />
           </Route>

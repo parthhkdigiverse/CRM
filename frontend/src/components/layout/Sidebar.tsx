@@ -60,7 +60,7 @@ const navigation = [
     items: [
       { name: 'HRMS', href: '/employees', icon: Users, isComingSoon: false, allowedRoles: ['super_admin', 'admin', 'hr'] },
       { name: 'Attendance', href: '/attendance', icon: Clock, isComingSoon: false, allowedRoles: ['super_admin', 'admin', 'hr', 'employee'] },
-      { name: 'Leave', href: '/leave', icon: CalendarDays, isComingSoon: true, allowedRoles: ['super_admin', 'admin', 'hr'] },
+      { name: 'Leaves', href: '/leaves', icon: CalendarDays, isComingSoon: false, allowedRoles: ['super_admin', 'admin', 'hr', 'employee'] },
       { name: 'Payroll', href: '/payroll', icon: CreditCard, isComingSoon: false, allowedRoles: ['super_admin', 'admin', 'hr', 'employee'] },
       { name: 'Targets', href: '/targets', icon: Target, isComingSoon: false, allowedRoles: ['super_admin', 'admin', 'hr', 'employee'] },
     ]

@@ -6,6 +6,7 @@ import { apiClient } from '@/lib/axios';
 import { toast } from 'sonner';
 import FormDrawer, { FormField, ChipSelect, inputClass, selectClass, textareaClass } from '@/components/FormDrawer';
 import MoreDetails from '@/components/MoreDetails';
+import { formatINR } from '@/lib/currency';
 
 interface Props {
   open: boolean;
@@ -142,7 +143,7 @@ export default function NewInvoiceDialog({ open, onOpenChange, onCreated }: Prop
       {/* Amount Total */}
       <div className="bg-purple-50 dark:bg-purple-950/20 rounded-xl px-4 py-3 flex justify-between items-center">
         <span className="text-xs font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider">Total</span>
-        <span className="text-lg font-bold text-purple-700 dark:text-purple-300">₹{total.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+        <span className="text-lg font-bold text-purple-700 dark:text-purple-300">{formatINR(total, 2)}</span>
       </div>
 
       <div className="grid grid-cols-2 gap-3">

@@ -10,6 +10,7 @@ from middleware.auth_middleware import get_current_user, get_current_org, org_fi
 from middleware.rbac import require_module_read, require_module_write, require_module_full
 from models.user import User
 from models.organization import Organization
+from models.employee import Employee
 from models.task import Task, TaskComment
 from schemas.task import TaskCreate, TaskUpdate, TaskResponse, CommentCreate
 from schemas.common import SuccessResponse, PaginatedResponse
@@ -55,7 +56,8 @@ async def list_tasks(
     
     query = org_filter(org)
     if current_user.role == "employee":
-        query["assigned_to"] = current_user.id
+        emp = await Employee.find_one({"user_id": current_user.id})
+        query["assigned_to"] = emp.id if emp else None
         
     if status:
         query["status"] = status
@@ -93,8 +95,10 @@ async def get_task(
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    if current_user.role == "employee" and task.assigned_to != current_user.id:
-        raise HTTPException(status_code=403, detail="You do not have permission to access this task")
+    if current_user.role == "employee":
+        emp = await Employee.find_one({"user_id": current_user.id})
+        if not emp or task.assigned_to != emp.id:
+            raise HTTPException(status_code=403, detail="You do not have permission to access this task")
         
     d = task.model_dump()
     d["id"] = str(d.pop("_id", task.id))
@@ -117,10 +121,19 @@ async def update_task(
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    if current_user.role == "employee" and task.assigned_to != current_user.id:
-        raise HTTPException(status_code=403, detail="You do not have permission to access this task")
+    if current_user.role == "employee":
+        emp = await Employee.find_one({"user_id": current_user.id})
+        if not emp or task.assigned_to != emp.id:
+            raise HTTPException(status_code=403, detail="You do not have permission to access this task")
         
     update_data = data.model_dump(exclude_unset=True)
+    
+    if current_user.role == "employee":
+        allowed_keys = {"status"}
+        update_keys = set(update_data.keys())
+        if not update_keys.issubset(allowed_keys):
+            raise HTTPException(status_code=403, detail="Employees can only update task status")
+            
     if "assigned_to" in update_data:
         update_data["assigned_to"] = PydanticObjectId(update_data["assigned_to"]) if update_data["assigned_to"] else None
     if "linked_id" in update_data:
@@ -148,8 +161,10 @@ async def delete_task(
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    if current_user.role == "employee" and task.assigned_to != current_user.id:
-        raise HTTPException(status_code=403, detail="You do not have permission to access this task")
+    if current_user.role == "employee":
+        emp = await Employee.find_one({"user_id": current_user.id})
+        if not emp or task.assigned_to != emp.id:
+            raise HTTPException(status_code=403, detail="You do not have permission to access this task")
         
     task.is_deleted = True
     task.deleted_at = utc_now()
@@ -172,8 +187,10 @@ async def add_task_comment(
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    if current_user.role == "employee" and task.assigned_to != current_user.id:
-        raise HTTPException(status_code=403, detail="You do not have permission to access this task")
+    if current_user.role == "employee":
+        emp = await Employee.find_one({"user_id": current_user.id})
+        if not emp or task.assigned_to != emp.id:
+            raise HTTPException(status_code=403, detail="You do not have permission to access this task")
         
     comment = TaskComment(
         user_id=current_user.id,

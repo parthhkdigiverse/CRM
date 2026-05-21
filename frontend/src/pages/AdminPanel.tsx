@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
-  Building2, Users, ShieldAlert, Trash2, Shield, MoreVertical, Plus, LogOut, Moon, Sun, Sparkles
+  Building2, Users, ShieldAlert, Trash2, Shield, MoreVertical, Plus, LogOut, Moon, Sun, Sparkles, ChevronDown, ChevronRight
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { 
@@ -24,6 +24,7 @@ import { useAuthStore } from '@/store/authStore';
 import { useThemeStore } from '@/store/themeStore';
 import { useNavigate } from 'react-router-dom';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import EntityActivityLog from '@/components/EntityActivityLog';
 
 interface Org {
   id: string;
@@ -114,11 +115,19 @@ export default function AdminPanel() {
 
 
   const [isOrgDialogOpen, setIsOrgDialogOpen] = useState(false);
+  const [isEditOrgDialogOpen, setIsEditOrgDialogOpen] = useState(false);
+  const [editOrgId, setEditOrgId] = useState('');
   const [newOrgName, setNewOrgName] = useState('');
   const [newOrgIndustry, setNewOrgIndustry] = useState('');
   const [newOrgEmail, setNewOrgEmail] = useState('');
   const [newOrgPassword, setNewOrgPassword] = useState('');
   const [isCreatingOrg, setIsCreatingOrg] = useState(false);
+
+  const [expandedAdmins, setExpandedAdmins] = useState<Record<string, boolean>>({});
+  
+  const toggleAdminExpand = (adminId: string) => {
+    setExpandedAdmins(prev => ({ ...prev, [adminId]: !prev[adminId] }));
+  };
 
   const { user, logout } = useAuthStore();
   const { isDark, toggleTheme } = useThemeStore();
@@ -176,6 +185,37 @@ export default function AdminPanel() {
     }
   };
 
+  const handleEditOrgClick = (org: Org) => {
+    setEditOrgId(org.id);
+    setNewOrgName(org.name);
+    setNewOrgIndustry(org.industry || '');
+    setNewOrgPassword('');
+    setIsEditOrgDialogOpen(true);
+  };
+
+  const handleUpdateOrg = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newOrgName.trim()) return;
+    
+    try {
+      setIsCreatingOrg(true);
+      const payload: any = { name: newOrgName, industry: newOrgIndustry };
+      if (newOrgPassword) payload.admin_password = newOrgPassword;
+      
+      await apiClient.put(`/admin/organizations/${editOrgId}`, payload);
+      toast.success('Organization updated successfully');
+      setNewOrgName('');
+      setNewOrgIndustry('');
+      setNewOrgPassword('');
+      setIsEditOrgDialogOpen(false);
+      fetchData();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.detail || 'Failed to update organization');
+    } finally {
+      setIsCreatingOrg(false);
+    }
+  };
+
   const handleDeactivateOrg = async (id: string) => {
     if (!confirm('Are you sure you want to deactivate this organization? This will disable all users in the organization.')) return;
     
@@ -212,6 +252,43 @@ export default function AdminPanel() {
   }
 
   const activeUsers = users.filter(u => u.is_active).length;
+
+  const renderUserCells = (user: AppUser) => (
+    <React.Fragment>
+      <td className="px-6 py-4">{user.email}</td>
+      <td className="px-6 py-4">
+        <span className={`px-2 py-1 rounded-md text-xs font-medium ${
+          user.role === 'super_admin' ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400' :
+          user.role === 'admin' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
+          user.role === 'hr' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
+          'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
+        }`}>
+          {user.role}
+        </span>
+      </td>
+      <td className="px-6 py-4">
+        {user.is_active ? 
+          <span className="text-emerald-500 flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500"></span> Active</span> : 
+          <span className="text-gray-500 flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-gray-500"></span> Inactive</span>
+        }
+      </td>
+      <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8">
+              <MoreVertical className="h-4 w-4 text-gray-500" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => handleChangeRole(user.id, 'super_admin')}>Make Super Admin</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleChangeRole(user.id, 'admin')}>Make Admin</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleChangeRole(user.id, 'hr')}>Make HR</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleChangeRole(user.id, 'employee')}>Make Employee</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </td>
+    </React.Fragment>
+  );
 
   return (
     <div className="min-h-screen bg-gray-50/50 dark:bg-gray-900">
@@ -316,7 +393,7 @@ export default function AdminPanel() {
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {orgs.map(org => (
-                <tr key={org.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-900/50">
+                <tr key={org.id} onClick={() => handleEditOrgClick(org)} className="hover:bg-gray-50/50 dark:hover:bg-gray-900/50 cursor-pointer">
                   <td className="px-6 py-4 font-medium">{org.name}</td>
                   <td className="px-6 py-4">{org.industry || '-'}</td>
                   <td className="px-6 py-4">
@@ -336,7 +413,7 @@ export default function AdminPanel() {
                   </td>
                   <td className="px-6 py-4">{new Date(org.created_at).toLocaleDateString()}</td>
                   <td className="px-6 py-4 text-right">
-                    <Button variant="ghost" size="icon" onClick={() => handleDeactivateOrg(org.id)} className="text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950">
+                    <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleDeactivateOrg(org.id); }} className="text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950">
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </td>
@@ -368,43 +445,54 @@ export default function AdminPanel() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-              {users.map(user => (
+              {users.filter(u => u.role === 'super_admin' || !u.org_id).map(user => (
                 <tr key={user.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-900/50">
-                  <td className="px-6 py-4 font-medium">{user.name}</td>
-                  <td className="px-6 py-4">{user.email}</td>
-                  <td className="px-6 py-4">
-                    <span className={`px-2 py-1 rounded-md text-xs font-medium ${
-                      user.role === 'super_admin' ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400' :
-                      user.role === 'admin' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
-                      user.role === 'hr' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
-                      'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
-                    }`}>
-                      {user.role}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    {user.is_active ? 
-                      <span className="text-emerald-500 flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500"></span> Active</span> : 
-                      <span className="text-gray-500 flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-gray-500"></span> Inactive</span>
-                    }
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreVertical className="h-4 w-4 text-gray-500" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleChangeRole(user.id, 'super_admin')}>Make Super Admin</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleChangeRole(user.id, 'admin')}>Make Admin</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleChangeRole(user.id, 'hr')}>Make HR</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleChangeRole(user.id, 'employee')}>Make Employee</DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </td>
+                  <td className="px-6 py-4 font-medium"><div className="pl-6">{user.name}</div></td>
+                  {renderUserCells(user)}
                 </tr>
               ))}
+
+              {users.filter(u => u.role === 'admin').map(admin => {
+                const childUsers = users.filter(u => u.org_id === admin.org_id && u.id !== admin.id);
+                const isExpanded = expandedAdmins[admin.id];
+                
+                return (
+                  <React.Fragment key={admin.id}>
+                    <tr onClick={() => childUsers.length > 0 && toggleAdminExpand(admin.id)} className={`hover:bg-gray-50/50 dark:hover:bg-gray-900/50 ${childUsers.length > 0 ? 'cursor-pointer' : ''}`}>
+                      <td className="px-6 py-4 font-medium">
+                        <div className="flex items-center gap-2">
+                          {childUsers.length > 0 ? (
+                            isExpanded ? <ChevronDown className="h-4 w-4 text-gray-500" /> : <ChevronRight className="h-4 w-4 text-gray-500" />
+                          ) : (
+                            <span className="w-4" />
+                          )}
+                          {admin.name}
+                        </div>
+                      </td>
+                      {renderUserCells(admin)}
+                    </tr>
+                    {isExpanded && childUsers.map(child => (
+                      <tr key={child.id} className="bg-gray-50/40 dark:bg-gray-900/30 hover:bg-gray-100/50 dark:hover:bg-gray-800/50">
+                        <td className="px-6 py-4 font-medium">
+                          <div className="flex items-center gap-2 pl-6">
+                            <div className="w-1.5 h-1.5 rounded-full bg-gray-400 dark:bg-gray-600" />
+                            {child.name}
+                          </div>
+                        </td>
+                        {renderUserCells(child)}
+                      </tr>
+                    ))}
+                  </React.Fragment>
+                );
+              })}
+
+              {users.filter(u => u.org_id && u.role !== 'admin' && !users.some(a => a.role === 'admin' && a.org_id === u.org_id)).map(user => (
+                <tr key={user.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-900/50">
+                  <td className="px-6 py-4 font-medium"><div className="pl-6 text-orange-600">{user.name} (No Admin)</div></td>
+                  {renderUserCells(user)}
+                </tr>
+              ))}
+
               {users.length === 0 && (
                 <tr>
                   <td colSpan={5} className="px-6 py-8 text-center text-gray-500">No users found</td>
@@ -470,6 +558,59 @@ export default function AdminPanel() {
               </Button>
               <Button type="submit" disabled={isCreatingOrg}>
                 {isCreatingOrg ? 'Creating...' : 'Create Organization'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={isEditOrgDialogOpen} onOpenChange={setIsEditOrgDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Edit Organization</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleUpdateOrg}>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="edit-org-name">Organization Name</Label>
+                <Input
+                  id="edit-org-name"
+                  value={newOrgName}
+                  onChange={(e: any) => setNewOrgName(e.target.value)}
+                  placeholder="e.g. Acme Corp"
+                  required
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-org-industry">Industry (Optional)</Label>
+                <Input
+                  id="edit-org-industry"
+                  value={newOrgIndustry}
+                  onChange={(e: any) => setNewOrgIndustry(e.target.value)}
+                  placeholder="e.g. Technology"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-org-password">New Admin Password (Optional)</Label>
+                <Input
+                  id="edit-org-password"
+                  type="password"
+                  value={newOrgPassword}
+                  onChange={(e: any) => setNewOrgPassword(e.target.value)}
+                  placeholder="Leave blank to keep current"
+                />
+              </div>
+            </div>
+            {editOrgId && (
+              <div className="px-1 mb-4">
+                <EntityActivityLog entityId={editOrgId} module="organization" />
+              </div>
+            )}
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsEditOrgDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isCreatingOrg}>
+                {isCreatingOrg ? 'Updating...' : 'Update Organization'}
               </Button>
             </DialogFooter>
           </form>

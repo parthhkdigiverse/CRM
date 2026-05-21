@@ -4,18 +4,34 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { 
-  Users, UserPlus, Activity, Clock, Search, TrendingUp, Upload
+  Users, UserPlus, Activity, Clock, Search, TrendingUp, Upload, Trash2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
 import { apiClient } from '@/lib/axios';
+import { useAuthStore } from '@/store/authStore';
 import NewContactDialog from '@/components/NewContactDialog';
+import FormDrawer, { FormField, inputClass, textareaClass } from '@/components/FormDrawer';
+import MoreDetails from '@/components/MoreDetails';
 
 export default function Contacts() {
+  const { user } = useAuthStore();
+  const isEmployee = user?.role === 'employee';
+
   const [contacts, setContacts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+
+  // Edit state
+  const [editOpen, setEditOpen] = useState(false);
+  const [editLoading, setEditLoading] = useState(false);
+  const [editContact, setEditContact] = useState<any>(null);
+  const [editForm, setEditForm] = useState({
+    first_name: '', last_name: '', phone: '', email: '', company: '',
+    job_title: '', notes: '', status: 'active', whatsapp: '', department: '',
+    address: '', birthday: '', social_links: '', tags: '',
+  });
 
   const fetchContacts = useCallback(async () => {
     try {
@@ -32,7 +48,80 @@ export default function Contacts() {
     fetchContacts();
   }, [fetchContacts]);
 
+  const openEdit = (c: any) => {
+    setEditContact(c);
+    setEditForm({
+      first_name: c.first_name || '',
+      last_name: c.last_name || '',
+      phone: c.phone || '',
+      email: c.email || '',
+      company: c.custom_fields?.company_name || '',
+      job_title: c.job_title || '',
+      notes: c.notes || '',
+      status: c.status || 'active',
+      whatsapp: c.custom_fields?.whatsapp || '',
+      department: c.custom_fields?.department || '',
+      address: c.custom_fields?.address || '',
+      birthday: c.custom_fields?.birthday || '',
+      social_links: c.custom_fields?.social_links || '',
+      tags: (c.tags || []).join(', '),
+    });
+    setEditOpen(true);
+  };
 
+  const ef = (field: string, value: string) => setEditForm(p => ({ ...p, [field]: value }));
+
+  const handleEditSave = async () => {
+    if (!editForm.first_name.trim()) { toast.error('First Name is required'); return; }
+    setEditLoading(true);
+    try {
+      const payload: Record<string, any> = {
+        first_name: editForm.first_name.trim(),
+        last_name: editForm.last_name.trim(),
+        status: editForm.status,
+      };
+      if (editForm.phone.trim()) payload.phone = editForm.phone.trim();
+      else payload.phone = null;
+      if (editForm.email.trim()) payload.email = editForm.email.trim();
+      else payload.email = null;
+      if (editForm.job_title.trim()) payload.job_title = editForm.job_title.trim();
+      else payload.job_title = null;
+      if (editForm.notes.trim()) payload.notes = editForm.notes.trim();
+      else payload.notes = null;
+      if (editForm.tags.trim()) payload.tags = editForm.tags.split(',').map((t: string) => t.trim()).filter(Boolean);
+      else payload.tags = [];
+
+      const custom: Record<string, string> = {};
+      if (editForm.whatsapp.trim()) custom.whatsapp = editForm.whatsapp.trim();
+      if (editForm.department.trim()) custom.department = editForm.department.trim();
+      if (editForm.address.trim()) custom.address = editForm.address.trim();
+      if (editForm.birthday.trim()) custom.birthday = editForm.birthday.trim();
+      if (editForm.social_links.trim()) custom.social_links = editForm.social_links.trim();
+      if (editForm.company.trim()) custom.company_name = editForm.company.trim();
+      payload.custom_fields = custom;
+
+      await apiClient.put(`/contacts/${editContact.id}`, payload);
+      toast.success('Contact updated successfully!');
+      setEditOpen(false);
+      await fetchContacts();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail || 'Failed to update contact');
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  const handleDelete = async (contactId: string) => {
+    if (!window.confirm('Are you sure you want to delete this contact?')) return;
+    try {
+      await apiClient.delete(`/contacts/${contactId}`);
+      toast.success('Contact deleted successfully');
+      setEditOpen(false);
+      await fetchContacts();
+    } catch {
+      toast.error('Failed to delete contact');
+    }
+  };
 
   return (
     <>
@@ -43,14 +132,16 @@ export default function Contacts() {
           <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">Contacts</h1>
           <p className="text-gray-500 dark:text-gray-400 mt-1">Manage your business contacts and relationships.</p>
         </div>
-        <div className="flex items-center gap-3">
-          <Button variant="outline" className="bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800 rounded-xl h-9 px-4" onClick={() => toast('Import coming soon!')}>
-            <Upload className="h-4 w-4 mr-2 text-gray-500" /> Import
-          </Button>
-          <Button className="bg-purple-600 hover:bg-purple-700 text-white rounded-xl h-9 px-4" onClick={() => setDialogOpen(true)}>
-            <UserPlus className="h-4 w-4 mr-2" /> Add Contact
-          </Button>
-        </div>
+        {!isEmployee && (
+          <div className="flex items-center gap-3">
+            <Button variant="outline" className="bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800 rounded-xl h-9 px-4" onClick={() => toast('Import coming soon!')}>
+              <Upload className="h-4 w-4 mr-2 text-gray-500" /> Import
+            </Button>
+            <Button className="bg-purple-600 hover:bg-purple-700 text-white rounded-xl h-9 px-4" onClick={() => setDialogOpen(true)}>
+              <UserPlus className="h-4 w-4 mr-2" /> Add Contact
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Metric Cards */}
@@ -114,7 +205,14 @@ export default function Contacts() {
                   const formattedStatus = c.status === 'active' ? 'Active' : 'Inactive';
                   
                   return (
-                    <tr key={c.id || i} className="hover:bg-gray-50/50 dark:hover:bg-gray-900/50 transition-colors cursor-pointer">
+                    <tr
+                      key={c.id || i}
+                      onClick={() => !isEmployee && openEdit(c)}
+                      className={cn(
+                        "hover:bg-gray-50/50 dark:hover:bg-gray-900/50 transition-colors",
+                        !isEmployee && "cursor-pointer hover:bg-purple-50/30 dark:hover:bg-purple-950/10"
+                      )}
+                    >
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           <Avatar className="h-8 w-8">
@@ -127,7 +225,7 @@ export default function Contacts() {
                       </td>
                       <td className="px-6 py-4 text-gray-600 dark:text-gray-400">{c.email || '-'}</td>
                       <td className="px-6 py-4 text-gray-600 dark:text-gray-400">{c.phone || '-'}</td>
-                      <td className="px-6 py-4 font-medium text-gray-700 dark:text-gray-300">{c.company_id ? 'View Details' : '-'}</td>
+                      <td className="px-6 py-4 font-medium text-gray-700 dark:text-gray-300">{c.custom_fields?.company_name || '-'}</td>
                       <td className="px-6 py-4 text-center">
                         <span className={cn(
                           "px-2.5 py-1 rounded-full text-xs font-bold",
@@ -146,7 +244,87 @@ export default function Contacts() {
         </div>
       </div>
     </div>
+
+    {/* Create Dialog */}
     <NewContactDialog open={dialogOpen} onOpenChange={setDialogOpen} onCreated={fetchContacts} />
+
+    {/* Edit Dialog */}
+    <FormDrawer
+      open={editOpen}
+      onClose={() => setEditOpen(false)}
+      title="Edit Contact"
+      subtitle={editContact ? `Update ${editContact.first_name} ${editContact.last_name}` : ''}
+      onSave={handleEditSave}
+      loading={editLoading}
+      editMode
+      entityId={editContact?.id}
+      module="contacts"
+    >
+      <div className="grid grid-cols-2 gap-3">
+        <FormField label="First Name" required>
+          <Input value={editForm.first_name} onChange={(e) => ef('first_name', e.target.value)} placeholder="Anita" className={inputClass} autoFocus />
+        </FormField>
+        <FormField label="Last Name">
+          <Input value={editForm.last_name} onChange={(e) => ef('last_name', e.target.value)} placeholder="Patel" className={inputClass} />
+        </FormField>
+      </div>
+
+      <FormField label="Phone">
+        <Input value={editForm.phone} onChange={(e) => ef('phone', e.target.value)} placeholder="+91 98765 43210" className={inputClass} />
+      </FormField>
+
+      <FormField label="Email">
+        <Input type="email" value={editForm.email} onChange={(e) => ef('email', e.target.value)} placeholder="anita@company.com" className={inputClass} />
+      </FormField>
+
+      <FormField label="Company">
+        <Input value={editForm.company} onChange={(e) => ef('company', e.target.value)} placeholder="e.g. Tata Motors" className={inputClass} />
+      </FormField>
+
+      <FormField label="Designation">
+        <Input value={editForm.job_title} onChange={(e) => ef('job_title', e.target.value)} placeholder="Sales Director" className={inputClass} />
+      </FormField>
+
+      <FormField label="Status">
+        <select value={editForm.status} onChange={(e) => ef('status', e.target.value)} className="w-full text-sm rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50 px-3 h-9 focus:outline-none focus:ring-1 focus:ring-purple-500">
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+          <option value="archived">Archived</option>
+        </select>
+      </FormField>
+
+      <FormField label="Notes">
+        <textarea value={editForm.notes} onChange={(e) => ef('notes', e.target.value)} placeholder="Any notes..." rows={2} className={textareaClass} />
+      </FormField>
+
+      <MoreDetails>
+        <FormField label="WhatsApp">
+          <Input value={editForm.whatsapp} onChange={(e) => ef('whatsapp', e.target.value)} placeholder="+91 98765 43210" className={inputClass} />
+        </FormField>
+        <FormField label="Department">
+          <Input value={editForm.department} onChange={(e) => ef('department', e.target.value)} placeholder="Marketing" className={inputClass} />
+        </FormField>
+        <FormField label="Address">
+          <textarea value={editForm.address} onChange={(e) => ef('address', e.target.value)} placeholder="Full address..." rows={2} className={textareaClass} />
+        </FormField>
+        <FormField label="Birthday">
+          <Input type="date" value={editForm.birthday} onChange={(e) => ef('birthday', e.target.value)} className={inputClass} />
+        </FormField>
+        <FormField label="Social Links">
+          <Input value={editForm.social_links} onChange={(e) => ef('social_links', e.target.value)} placeholder="LinkedIn, Twitter..." className={inputClass} />
+        </FormField>
+        <FormField label="Tags">
+          <Input value={editForm.tags} onChange={(e) => ef('tags', e.target.value)} placeholder="VIP, Partner (comma separated)" className={inputClass} />
+        </FormField>
+      </MoreDetails>
+
+      {/* Delete */}
+      <div className="border-t border-gray-100 dark:border-gray-800 pt-3 mt-2">
+        <Button type="button" variant="ghost" size="sm" className="text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20" onClick={() => { if (editContact) handleDelete(editContact.id); }}>
+          <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Delete Contact
+        </Button>
+      </div>
+    </FormDrawer>
     </>
   );
 }

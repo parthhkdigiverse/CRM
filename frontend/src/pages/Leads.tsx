@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { formatINRCompact } from '@/lib/currency';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -90,15 +91,7 @@ export default function Leads() {
     }
   };
 
-  const formatIndianCurrency = (value: number) => {
-    if (!value) return '₹0';
-    if (value >= 100000) {
-      return `₹${(value / 100000).toFixed(1).replace(/\.0$/, '')}L`;
-    } else if (value >= 1000) {
-      return `₹${(value / 1000).toFixed(1).replace(/\.0$/, '')}K`;
-    }
-    return `₹${value}`;
-  };
+
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-8">
@@ -207,7 +200,7 @@ export default function Leads() {
                     <td className="px-6 py-4">
                       <div>
                         <span className="text-gray-700 dark:text-gray-300 font-medium">{l.company || '—'}</span>
-                        <p className="text-xs font-semibold text-purple-600 dark:text-purple-400 mt-0.5">{formatIndianCurrency(l.value)}</p>
+                        <p className="text-xs font-semibold text-purple-600 dark:text-purple-400 mt-0.5">{formatINRCompact(l.value)}</p>
                       </div>
                     </td>
                     <td className="px-6 py-4 text-center">

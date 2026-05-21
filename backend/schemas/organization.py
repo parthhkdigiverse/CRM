@@ -26,6 +26,12 @@ class AdminOrgCreate(BaseModel):
     industry: Optional[str] = None
 
 
+class AdminOrgUpdate(BaseModel):
+    name: Optional[str] = None
+    industry: Optional[str] = None
+    admin_password: Optional[str] = None
+
+
 class OrgUpdate(BaseModel):
     name: Optional[str] = None
     industry: Optional[str] = None

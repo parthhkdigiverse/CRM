@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { formatINRCompact } from '@/lib/currency';
 
 import { apiClient } from '@/lib/axios';
 import { useAuthStore } from '@/store/authStore';
@@ -174,29 +175,9 @@ export default function Projects() {
     );
   };
 
-  // Currency & cost formatting helpers
-  const formatCost = (val: number) => {
-    if (val >= 100000) {
-      // e.g. 22.4L or 4.5L
-      return `₹${(val / 100000).toFixed(1)}L`;
-    }
-    if (val >= 1000) {
-      // e.g. 450k
-      return `₹${Math.round(val / 1000)}k`;
-    }
-    return `₹${val}`;
-  };
-
-  const formatBudgetDisplay = (val: number) => {
-    if (val >= 100000) {
-      return `₹${(val / 100000).toFixed(1)}L`;
-    }
-    return `₹${val}`;
-  };
-
   // Get total budget sum formatted
   const totalBudgetVal = projects.reduce((acc, curr) => acc + (curr.budget || 0), 0);
-  const totalBudgetFormatted = formatBudgetDisplay(totalBudgetVal);
+  const totalBudgetFormatted = formatINRCompact(totalBudgetVal);
 
   // Filter projects list
   const filteredProjects = projects.filter(p => {
@@ -230,12 +211,14 @@ export default function Projects() {
               className="pl-9 rounded-xl border-gray-200 dark:border-gray-800 h-9 bg-white dark:bg-gray-950 shadow-sm" 
             />
           </div>
-          <Button 
-            onClick={() => openDialog(null)}
-            className="bg-purple-600 hover:bg-purple-700 text-white rounded-xl h-9 px-4 active:scale-95 transition-all shadow-sm font-medium"
-          >
-            <Plus className="h-4 w-4 mr-2" /> New Project
-          </Button>
+          {!isEmployee && (
+            <Button 
+              onClick={() => openDialog(null)}
+              className="bg-purple-600 hover:bg-purple-700 text-white rounded-xl h-9 px-4 active:scale-95 transition-all shadow-sm font-medium"
+            >
+              <Plus className="h-4 w-4 mr-2" /> New Project
+            </Button>
+          )}
         </div>
       </div>
 
@@ -325,9 +308,11 @@ export default function Projects() {
           <Folder className="h-10 w-10 text-gray-400 mb-3" />
           <h3 className="text-lg font-bold text-gray-900 dark:text-white">No projects found</h3>
           <p className="text-gray-500 max-w-sm mt-1">Get started by creating your first client project.</p>
-          <Button onClick={() => openDialog(null)} className="mt-4 bg-purple-600 hover:bg-purple-700 text-white rounded-xl">
-            <Plus className="h-4 w-4 mr-2" /> New Project
-          </Button>
+          {!isEmployee && (
+            <Button onClick={() => openDialog(null)} className="mt-4 bg-purple-600 hover:bg-purple-700 text-white rounded-xl">
+              <Plus className="h-4 w-4 mr-2" /> New Project
+            </Button>
+          )}
         </div>
       ) : (
         <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
@@ -421,7 +406,7 @@ export default function Projects() {
                       </span>
                     )}
                     <span className="text-gray-600 dark:text-gray-300 font-bold">
-                      {formatCost(project.budget || 0)}
+                      {formatINRCompact(project.budget || 0)}
                     </span>
                   </div>
                 </div>

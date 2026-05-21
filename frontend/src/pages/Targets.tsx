@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { formatINR, formatINRCompact } from '@/lib/currency';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -175,8 +176,7 @@ export default function Targets() {
 
   const formatValue = (val: number, u: string) => {
     if (u === '₹') {
-      if (val >= 100000) return `₹${(val / 100000).toFixed(1)}L`;
-      return `₹${val.toLocaleString('en-IN')}`;
+      return formatINRCompact(val);
     }
     if (u === '%') return `${val}%`;
     return `${val.toLocaleString('en-IN')}${u ? ` ${u}` : ''}`;

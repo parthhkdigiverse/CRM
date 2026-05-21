@@ -13,7 +13,7 @@ from models.user import User
 from models.organization import Organization
 from models.employee import Employee
 from models.attendance import Attendance
-from schemas.attendance import AttendanceCheckIn, AttendanceCheckOut, AttendanceResponse
+from schemas.attendance import AttendanceCheckIn, AttendanceCheckOut, AttendanceBreakIn, AttendanceBreakOut, AttendanceResponse
 from schemas.common import SuccessResponse
 from utils.helpers import utc_now
 from services.audit_service import log_action
@@ -143,6 +143,91 @@ async def check_out(
     )
 
 
+@router.post("/break-in", response_model=SuccessResponse)
+async def break_in(
+    data: AttendanceBreakIn,
+    current_user: User = Depends(require_module_write("attendance")),
+    org: Optional[Organization] = Depends(get_current_org)
+):
+    if data.employee_id:
+        employee = await Employee.find_one(org_filter(org, {"_id": PydanticObjectId(data.employee_id)}))
+        if not employee:
+            raise HTTPException(status_code=404, detail="Employee not found")
+        if current_user.role == "employee" and employee.user_id != current_user.id:
+            raise HTTPException(status_code=403, detail="You can only break-in for yourself")
+    else:
+        employee = await get_or_create_user_employee(current_user, org.id if org else None)
+
+    today_str = get_today_date_str()
+    attendance = await Attendance.find_one(Attendance.employee_id == employee.id, Attendance.date == today_str)
+    if not attendance:
+        raise HTTPException(status_code=400, detail="You must check in before taking a break")
+    if attendance.check_out:
+        raise HTTPException(status_code=400, detail="Cannot take a break after checking out")
+        
+    # Check if already on break
+    if attendance.breaks and attendance.breaks[-1].get("break_out") is None:
+        raise HTTPException(status_code=400, detail="Already on a break")
+
+    new_break_in = utc_now()
+    attendance.breaks.append({
+        "break_in": new_break_in,
+        "break_out": None
+    })
+    attendance.updated_at = utc_now()
+    await attendance.save()
+
+    await log_action(str(org.id) if org else None, str(current_user.id), "update", "attendance", str(attendance.id), changes={"employee_name": employee.name, "action": "break-in"})
+
+    return SuccessResponse(
+        data={
+            "id": str(attendance.id),
+            "break_in": new_break_in
+        },
+        message="Break started"
+    )
+
+
+@router.post("/break-out", response_model=SuccessResponse)
+async def break_out(
+    data: AttendanceBreakOut,
+    current_user: User = Depends(require_module_write("attendance")),
+    org: Optional[Organization] = Depends(get_current_org)
+):
+    if data.employee_id:
+        employee = await Employee.find_one(org_filter(org, {"_id": PydanticObjectId(data.employee_id)}))
+        if not employee:
+            raise HTTPException(status_code=404, detail="Employee not found")
+        if current_user.role == "employee" and employee.user_id != current_user.id:
+            raise HTTPException(status_code=403, detail="You can only end a break for yourself")
+    else:
+        employee = await get_or_create_user_employee(current_user, org.id if org else None)
+
+    today_str = get_today_date_str()
+    attendance = await Attendance.find_one(Attendance.employee_id == employee.id, Attendance.date == today_str)
+    if not attendance:
+        raise HTTPException(status_code=400, detail="No attendance record found")
+    
+    # Check if currently on break
+    if not attendance.breaks or attendance.breaks[-1].get("break_out") is not None:
+        raise HTTPException(status_code=400, detail="You are not on a break")
+
+    end_time = utc_now()
+    attendance.breaks[-1]["break_out"] = end_time
+    attendance.updated_at = utc_now()
+    await attendance.save()
+
+    await log_action(str(org.id) if org else None, str(current_user.id), "update", "attendance", str(attendance.id), changes={"employee_name": employee.name, "action": "break-out"})
+
+    return SuccessResponse(
+        data={
+            "id": str(attendance.id),
+            "break_out": end_time
+        },
+        message="Break ended"
+    )
+
+
 @router.get("/today", response_model=SuccessResponse)
 async def get_today_attendance(
     current_user: User = Depends(require_module_read("attendance")),
@@ -193,6 +278,7 @@ async def get_today_attendance(
             "department": emp.department or "Sales",
             "check_in": log.check_in if log else None,
             "check_out": log.check_out if log else None,
+            "breaks": log.breaks if log else [],
             "status": status_str,
         })
         

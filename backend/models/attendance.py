@@ -16,6 +16,7 @@ class Attendance(Document):
     date: str  # Format: YYYY-MM-DD
     check_in: Optional[datetime] = None
     check_out: Optional[datetime] = None
+    breaks: list = Field(default_factory=list)
     status: str = "present"  # present, late, absent, on_leave
 
     # Base fields

@@ -6,6 +6,7 @@ import {
   FileText, IndianRupee, Clock, AlertTriangle, Search, Download, TrendingUp, Plus
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { formatINR } from '@/lib/currency';
 import { toast } from 'sonner';
 
 import { apiClient } from '@/lib/axios';
@@ -56,10 +57,10 @@ export default function Invoices() {
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {[
-          { label: 'Total Invoiced', value: `₹${invoices.reduce((sum, inv) => sum + (inv.total || 0), 0).toLocaleString()}`, icon: FileText, bg: 'bg-purple-100 dark:bg-purple-900/30', fg: 'text-purple-600 dark:text-purple-400', change: '+0%' },
-          { label: 'Paid', value: `₹${invoices.filter(i => i.status === 'paid').reduce((sum, inv) => sum + (inv.total || 0), 0).toLocaleString()}`, icon: IndianRupee, bg: 'bg-emerald-100 dark:bg-emerald-900/30', fg: 'text-emerald-600 dark:text-emerald-400', change: '+0%' },
-          { label: 'Pending', value: `₹${invoices.filter(i => i.status === 'pending').reduce((sum, inv) => sum + (inv.total || 0), 0).toLocaleString()}`, icon: Clock, bg: 'bg-orange-100 dark:bg-orange-900/30', fg: 'text-orange-600 dark:text-orange-400', change: '-0%' },
-          { label: 'Overdue', value: `₹${invoices.filter(i => i.status === 'overdue').reduce((sum, inv) => sum + (inv.total || 0), 0).toLocaleString()}`, icon: AlertTriangle, bg: 'bg-red-100 dark:bg-red-900/30', fg: 'text-red-600 dark:text-red-400', change: '-0%' },
+          { label: 'Total Invoiced', value: formatINR(invoices.reduce((sum, inv) => sum + (inv.total || 0), 0)), icon: FileText, bg: 'bg-purple-100 dark:bg-purple-900/30', fg: 'text-purple-600 dark:text-purple-400', change: '+0%' },
+          { label: 'Paid', value: formatINR(invoices.filter(i => i.status === 'paid').reduce((sum, inv) => sum + (inv.total || 0), 0)), icon: IndianRupee, bg: 'bg-emerald-100 dark:bg-emerald-900/30', fg: 'text-emerald-600 dark:text-emerald-400', change: '+0%' },
+          { label: 'Pending', value: formatINR(invoices.filter(i => i.status === 'pending').reduce((sum, inv) => sum + (inv.total || 0), 0)), icon: Clock, bg: 'bg-orange-100 dark:bg-orange-900/30', fg: 'text-orange-600 dark:text-orange-400', change: '-0%' },
+          { label: 'Overdue', value: formatINR(invoices.filter(i => i.status === 'overdue').reduce((sum, inv) => sum + (inv.total || 0), 0)), icon: AlertTriangle, bg: 'bg-red-100 dark:bg-red-900/30', fg: 'text-red-600 dark:text-red-400', change: '-0%' },
         ].map((stat, i) => (
           <Card key={i} className="border-0 shadow-sm rounded-2xl bg-white dark:bg-gray-950">
             <CardContent className="p-5 flex justify-between items-start">
@@ -115,7 +116,7 @@ export default function Invoices() {
                   <tr key={inv.id || i} className="hover:bg-gray-50/50 dark:hover:bg-gray-900/50 transition-colors cursor-pointer">
                     <td className="px-6 py-4 font-bold text-gray-700 dark:text-gray-300">{inv.invoice_number || `INV-${inv.id.substring(0,6)}`}</td>
                     <td className="px-6 py-4 font-medium text-gray-900 dark:text-gray-100">{inv.company_id || inv.contact_id || 'Unknown'}</td>
-                    <td className="px-6 py-4 text-right font-bold text-blue-600 dark:text-blue-400">₹{inv.total?.toLocaleString() || 0}</td>
+                    <td className="px-6 py-4 text-right font-bold text-blue-600 dark:text-blue-400">{formatINR(inv.total)}</td>
                     <td className="px-6 py-4 text-gray-500">{new Date(inv.created_at).toLocaleDateString()}</td>
                     <td className="px-6 py-4 text-gray-500">{inv.due_date ? new Date(inv.due_date).toLocaleDateString() : 'N/A'}</td>
                     <td className="px-6 py-4 text-center">

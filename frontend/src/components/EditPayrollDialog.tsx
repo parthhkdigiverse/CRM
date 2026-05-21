@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import EntityActivityLog from '@/components/EntityActivityLog';
 import { apiClient } from '@/lib/axios';
 import { toast } from 'sonner';
+import { formatINR } from '@/lib/currency';
 
 interface EditPayrollDialogProps {
   open: boolean;
@@ -170,7 +171,7 @@ export default function EditPayrollDialog({ open, onOpenChange, payroll, onUpdat
                 <span className="text-sm">Calculated Net Pay</span>
               </div>
               <div className="text-xl font-bold text-emerald-700 dark:text-emerald-300">
-                ₹{netPay.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                {formatINR(netPay)}
               </div>
             </div>
             

@@ -10,7 +10,7 @@ from middleware.auth_middleware import get_current_user, require_roles
 from models.user import User
 from models.organization import Organization
 from schemas.common import SuccessResponse
-from schemas.organization import AdminOrgCreate
+from schemas.organization import AdminOrgCreate, AdminOrgUpdate
 from utils.helpers import utc_now
 from utils.security import hash_password
 
@@ -66,6 +66,56 @@ async def create_organization(
             "admin_user_id": str(admin_user.id)
         }
     )
+
+
+@router.put("/organizations/{org_id}", response_model=SuccessResponse,
+            dependencies=[Depends(require_roles("super_admin"))])
+async def update_organization(
+    org_id: str,
+    data: AdminOrgUpdate,
+    current_user: User = Depends(get_current_user)
+):
+    """Update organization details and optionally change admin password."""
+    org = await Organization.get(PydanticObjectId(org_id))
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization not found")
+        
+    if data.name:
+        org.name = data.name
+    if data.industry is not None:
+        org.industry = data.industry
+        
+    org.updated_at = utc_now()
+    org.updated_by = current_user.id
+    await org.save()
+    
+    # Create audit log
+    from models.audit_log import AuditLog
+    changes = {}
+    if data.name: changes["name"] = data.name
+    if data.industry is not None: changes["industry"] = data.industry
+    if data.admin_password: changes["admin_password"] = "***"
+    
+    log = AuditLog(
+        action="update",
+        module="organization",
+        entity_id=org.id,
+        user_id=current_user.id,
+        org_id=org.id,
+        created_by=current_user.id,
+        changes=changes
+    )
+    await log.insert()
+    
+    if data.admin_password:
+        admin_user = await User.find_one({"org_id": org.id, "role": "admin", "is_deleted": {"$ne": True}})
+        if admin_user:
+            admin_user.hashed_password = hash_password(data.admin_password)
+            admin_user.updated_at = utc_now()
+            admin_user.updated_by = current_user.id
+            await admin_user.save()
+            
+    return SuccessResponse(message=f"Organization '{org.name}' updated successfully")
 
 
 @router.get("/organizations", response_model=SuccessResponse,

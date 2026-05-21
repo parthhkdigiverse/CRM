@@ -26,6 +26,7 @@ from models.meeting import Meeting
 from models.document import DocumentModel
 from models.target import Target
 from models.payroll import Payroll
+from models.leave import Leave
 
 _client: AsyncIOMotorClient = None
 
@@ -50,6 +51,7 @@ ALL_MODELS = [
     DocumentModel,
     Target,
     Payroll,
+    Leave,
 ]
 
 

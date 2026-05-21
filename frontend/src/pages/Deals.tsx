@@ -14,6 +14,7 @@ import {
   MoreHorizontal
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { formatINRCompact } from '@/lib/currency';
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/axios';
 import NewLeadDialog from '@/components/NewLeadDialog';
@@ -75,14 +76,7 @@ const stageConfig = [
   { id: 'closed_won', name: 'Won', color: 'bg-emerald-500 border-emerald-500' },
 ];
 
-const formatIndianCurrency = (value: number) => {
-  if (value >= 100000) {
-    return `₹${(value / 100000).toFixed(1).replace(/\.0$/, '')}L`;
-  } else if (value >= 1000) {
-    return `₹${(value / 1000).toFixed(1).replace(/\.0$/, '')}K`;
-  }
-  return `₹${value}`;
-};
+
 
 const getAvatarColor = (name: string) => {
   const colors = [
@@ -248,7 +242,7 @@ export default function Deals() {
             <div className="space-y-2">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">ACTIVE PIPELINE</p>
               <div className="text-3xl font-bold">
-                {formatIndianCurrency(activePipelineValue)}
+                {formatINRCompact(activePipelineValue)}
               </div>
               <p className="text-xs font-medium text-emerald-500 flex items-center">
                 <TrendingUp className="h-3 w-3 mr-1" /> +14.5% vs last month
@@ -280,7 +274,7 @@ export default function Deals() {
             <div className="space-y-2">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">AVG DEAL SIZE</p>
               <div className="text-3xl font-bold">
-                {formatIndianCurrency(avgDealValue)}
+                {formatINRCompact(avgDealValue)}
               </div>
               <p className="text-xs font-medium text-emerald-500 flex items-center">
                 <TrendingUp className="h-3 w-3 mr-1" /> +5.1% vs last month
@@ -359,7 +353,7 @@ export default function Deals() {
                         
                         <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-50 dark:border-gray-900">
                           <span className="text-sm font-bold text-blue-600 dark:text-blue-400">
-                            {formatIndianCurrency(deal.value)}
+                            {formatINRCompact(deal.value)}
                           </span>
                           <div className="flex gap-2.5 opacity-60 group-hover:opacity-100 transition-opacity">
                             <button className="text-gray-400 hover:text-purple-600 transition-colors" onClick={(e) => { e.stopPropagation(); toast('Email coming soon!'); }}>
@@ -429,7 +423,7 @@ export default function Deals() {
                     {client.contact_phone}
                   </td>
                   <td className="px-6 py-4 font-semibold text-gray-950 dark:text-gray-50">
-                    {formatIndianCurrency(client.value)}
+                    {formatINRCompact(client.value)}
                   </td>
                   <td className="px-6 py-4 text-center">
                     <span className={cn("px-2.5 py-1 rounded-full text-xs font-bold capitalize border", 

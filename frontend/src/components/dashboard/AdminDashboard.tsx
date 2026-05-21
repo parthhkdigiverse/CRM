@@ -26,6 +26,7 @@ import {
 
 import { useAuthStore } from '@/store/authStore';
 import { apiClient } from '@/lib/axios';
+import { formatINRCompact } from '@/lib/currency';
 
 const pieData = [
   { name: 'Sales', value: 400, color: '#8b5cf6' },
@@ -48,19 +49,7 @@ export default function AdminDashboard() {
 
   const [chartData, setChartData] = useState<any[]>([]);
 
-  const formatIndianCurrency = (value: number) => {
-    if (!value) return '₹0';
-    if (value >= 10000000) {
-      return `₹${(value / 10000000).toFixed(2).replace(/\.00$/, '')}Cr`;
-    }
-    if (value >= 100000) {
-      return `₹${(value / 100000).toFixed(2).replace(/\.00$/, '')}L`;
-    }
-    if (value >= 1000) {
-      return `₹${(value / 1000).toFixed(1).replace(/\.0$/, '')}K`;
-    }
-    return `₹${value.toLocaleString('en-IN')}`;
-  };
+
 
   const buildChartsData = (invoicesList: any[]) => {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -197,7 +186,7 @@ export default function AdminDashboard() {
           <CardContent className="p-5 flex justify-between items-start">
             <div className="space-y-2">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Revenue</p>
-              <div className="text-3xl font-bold">{formatIndianCurrency(stats.totalRevenue)}</div>
+              <div className="text-3xl font-bold">{formatINRCompact(stats.totalRevenue)}</div>
               <p className="text-xs font-medium text-emerald-500 flex items-center">
                 <TrendingUp className="h-3 w-3 mr-1" /> Live paid invoices
               </p>
@@ -229,7 +218,7 @@ export default function AdminDashboard() {
           <CardContent className="p-5 flex justify-between items-start">
             <div className="space-y-2">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Recent Wins</p>
-              <div className="text-3xl font-bold">{formatIndianCurrency(stats.salesToday)}</div>
+              <div className="text-3xl font-bold">{formatINRCompact(stats.salesToday)}</div>
               <p className="text-xs font-medium text-emerald-500 flex items-center">
                 <TrendingUp className="h-3 w-3 mr-1" /> Total won deals value
               </p>
@@ -245,7 +234,7 @@ export default function AdminDashboard() {
           <CardContent className="p-5 flex justify-between items-start">
             <div className="space-y-2">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Pending Dues</p>
-              <div className="text-3xl font-bold">{formatIndianCurrency(stats.pendingDues)}</div>
+              <div className="text-3xl font-bold">{formatINRCompact(stats.pendingDues)}</div>
               <p className="text-xs font-medium text-orange-500 flex items-center">
                 Unpaid sent invoices
               </p>

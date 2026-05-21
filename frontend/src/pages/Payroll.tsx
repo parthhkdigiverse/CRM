@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { formatINR, formatINRCompact } from '@/lib/currency';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -117,15 +118,12 @@ export default function Payroll() {
   const totalPaid = payrolls.filter((e) => e.status === 'Paid').reduce((s, e) => s + e.netPay, 0);
   const totalPending = payrolls.filter((e) => e.status === 'Pending').reduce((s, e) => s + e.netPay, 0);
 
-  const formatCurrency = (val: number) => {
-    if (val >= 100000) return `₹${(val / 100000).toFixed(2)}L`;
-    return `₹${val.toLocaleString('en-IN')}`;
-  };
+
 
   const stats = [
     {
       label: 'Monthly Payroll',
-      value: formatCurrency(totalMonthly),
+      value: formatINRCompact(totalMonthly),
       icon: CreditCard,
       color: 'bg-purple-50 dark:bg-purple-950/30',
       iconColor: 'text-purple-600 dark:text-purple-400',
@@ -133,7 +131,7 @@ export default function Payroll() {
     },
     {
       label: 'Paid',
-      value: formatCurrency(totalPaid),
+      value: formatINRCompact(totalPaid),
       icon: TrendingUp,
       color: 'bg-emerald-50 dark:bg-emerald-950/30',
       iconColor: 'text-emerald-600 dark:text-emerald-400',
@@ -141,7 +139,7 @@ export default function Payroll() {
     },
     {
       label: 'Pending',
-      value: formatCurrency(totalPending),
+      value: formatINRCompact(totalPending),
       icon: Clock,
       color: 'bg-amber-50 dark:bg-amber-950/30',
       iconColor: 'text-amber-600 dark:text-amber-400',
@@ -287,16 +285,16 @@ export default function Payroll() {
                         {entry.leaves}
                       </td>
                       <td className="py-3 px-3 text-right text-sm text-gray-700 dark:text-gray-300">
-                        ₹{entry.basic.toLocaleString('en-IN')}
+                        {formatINR(entry.basic)}
                       </td>
                       <td className="py-3 px-3 text-right text-sm text-emerald-600 dark:text-emerald-400">
-                        {entry.bonus > 0 ? '+' : ''}₹{entry.bonus.toLocaleString('en-IN')}
+                        {entry.bonus > 0 ? '+' : ''}{formatINR(entry.bonus)}
                       </td>
                       <td className="py-3 px-3 text-right text-sm text-rose-500 font-medium">
-                        -₹{entry.deductions.toLocaleString('en-IN')}
+                        -{formatINR(entry.deductions)}
                       </td>
                       <td className="py-3 px-3 text-right text-sm font-bold text-gray-900 dark:text-white">
-                        ₹{entry.netPay.toLocaleString('en-IN')}
+                        {formatINR(entry.netPay)}
                       </td>
                       <td className="py-3 px-3 text-center">
                         <span

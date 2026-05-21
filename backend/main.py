@@ -13,7 +13,7 @@ from fastapi.exceptions import RequestValidationError
 from config import settings
 from database import init_db, close_db
 from schemas.common import ErrorResponse, ErrorDetail
-from routers import auth, organization, contact, company, lead, deal, invoice, task, employee, ai, attendance, project, meeting, document, audit_log, target, super_admin, payroll
+from routers import auth, organization, contact, company, lead, deal, invoice, task, employee, ai, attendance, project, meeting, document, audit_log, target, super_admin, payroll, leave
 
 # Setup basic logging
 logging.basicConfig(
@@ -114,6 +114,7 @@ app.include_router(audit_log.router)
 app.include_router(target.router)
 app.include_router(super_admin.router)
 app.include_router(payroll.router)
+app.include_router(leave.router)
 
 
 @app.get("/api/health", tags=["System"])

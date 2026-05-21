@@ -2,7 +2,7 @@
 Authentication routes — local auth, Google OAuth, password reset, email verification.
 """
 
-from fastapi import APIRouter, Depends, Request, Response, status, HTTPException
+from fastapi import APIRouter, Depends, Request, Response, status, HTTPException, UploadFile, File
 from fastapi.responses import RedirectResponse
 
 from middleware.auth_middleware import get_current_user
@@ -242,3 +242,40 @@ async def update_me(
     
     return SuccessResponse(message="Profile updated successfully")
 
+
+@router.post("/me/avatar", response_model=SuccessResponse)
+async def upload_avatar(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user)
+):
+    """Upload user avatar image."""
+    import os
+    import shutil
+    from config import settings
+    
+    avatar_dir = os.path.join(os.getcwd(), "storage", "avatars")
+    os.makedirs(avatar_dir, exist_ok=True)
+    
+    file_extension = file.filename.split('.')[-1].lower() if '.' in file.filename else 'png'
+    file_name = f"{current_user.id}_{int(utc_now().timestamp())}.{file_extension}"
+    file_path = os.path.join(avatar_dir, file_name)
+    
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+        
+    avatar_url = f"{settings.FRONTEND_URL.replace('5173', '8000')}/storage/avatars/{file_name}"
+    
+    current_user.avatar_url = avatar_url
+    current_user.updated_at = utc_now()
+    await current_user.save()
+    
+    await log_action(
+        str(current_user.org_id) if current_user.org_id else "",
+        str(current_user.id),
+        "update",
+        "users",
+        str(current_user.id),
+        {"field": "avatar_url"}
+    )
+    
+    return SuccessResponse(message="Avatar uploaded successfully", data={"avatar_url": avatar_url})

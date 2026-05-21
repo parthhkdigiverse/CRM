@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { 
   CalendarDays, 
   CheckCircle2, 
@@ -197,6 +197,7 @@ export default function Leaves() {
                     <td className="py-4 px-6">
                       <div className="flex items-center gap-3">
                         <Avatar className="h-10 w-10">
+                          {leave.avatar_url && <AvatarImage src={leave.avatar_url} alt="Profile" className="object-cover" />}
                           <AvatarFallback className="bg-indigo-100 text-indigo-700 font-bold text-xs uppercase">
                             {leave.employee_name?.substring(0,2) || 'EM'}
                           </AvatarFallback>

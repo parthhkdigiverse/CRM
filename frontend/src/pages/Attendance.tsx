@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { 
   Clock, 
   MapPin, 
@@ -356,6 +356,7 @@ export default function AttendancePage() {
                       <td className="py-4 px-6">
                         <div className="flex items-center gap-3">
                           <Avatar className="h-10 w-10 ring-2 ring-white dark:ring-gray-950 shadow-sm transition-transform group-hover:scale-105">
+                            {rec.avatar_url && <AvatarImage src={rec.avatar_url} alt="Profile" className="object-cover" />}
                             <AvatarFallback className={cn("font-bold text-xs", avatarColor)}>
                               {initials}
                             </AvatarFallback>

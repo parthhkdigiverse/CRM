@@ -11,7 +11,7 @@ import {
   User,
   Settings
 } from 'lucide-react';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { useAuthStore } from '@/store/authStore';
 import { useThemeStore } from '@/store/themeStore';
@@ -111,6 +111,9 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Avatar className="h-8 w-8 cursor-pointer ring-2 ring-transparent hover:ring-purple-500 transition-all">
+                {user?.avatar_url && (
+                  <AvatarImage src={user.avatar_url} alt="Profile" className="object-cover" />
+                )}
                 <AvatarFallback className="bg-purple-600 text-white text-xs font-semibold">{initials}</AvatarFallback>
               </Avatar>
             </DropdownMenuTrigger>

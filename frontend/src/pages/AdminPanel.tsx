@@ -23,7 +23,7 @@ import { apiClient } from '@/lib/axios';
 import { useAuthStore } from '@/store/authStore';
 import { useThemeStore } from '@/store/themeStore';
 import { useNavigate } from 'react-router-dom';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import EntityActivityLog from '@/components/EntityActivityLog';
 
 interface Org {
@@ -314,6 +314,7 @@ export default function AdminPanel() {
           </Button>
           <div className="flex items-center gap-2 pl-2 border-l border-gray-200 dark:border-gray-800">
             <Avatar className="h-8 w-8">
+              {user?.avatar_url && <AvatarImage src={user.avatar_url} alt="Profile" className="object-cover" />}
               <AvatarFallback className="bg-rose-600 text-white text-xs font-semibold">{initials}</AvatarFallback>
             </Avatar>
             <span className="text-sm font-medium text-gray-700 dark:text-gray-300 hidden sm:block">{user?.email}</span>

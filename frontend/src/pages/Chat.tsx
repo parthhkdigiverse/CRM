@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Search, Send, Users, X, Check, CheckCheck, ArrowLeft, MessageSquare, Loader2, Smile, MoreVertical } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { apiClient } from '@/lib/axios';
@@ -198,6 +198,7 @@ export default function Chat() {
           <div className="h-[76px] px-6 flex items-center justify-between shrink-0 border-b border-gray-200 dark:border-white/10 bg-white dark:bg-slate-800/20 dark:backdrop-blur-md relative z-20 transition-colors">
             <div className="flex items-center gap-3">
               <Avatar className="h-[46px] w-[46px] shadow-sm border border-gray-100 dark:border-slate-700">
+                {user?.avatar_url && <AvatarImage src={user.avatar_url} alt="Profile" className="object-cover" />}
                 <AvatarFallback className="text-violet-600 dark:text-violet-400 text-sm font-bold bg-gray-50 dark:bg-slate-800">{ini(user?.name || user?.email || 'Me')}</AvatarFallback>
               </Avatar>
               <h2 className="text-[20px] font-bold text-gray-800 dark:bg-gradient-to-r dark:from-violet-400 dark:to-fuchsia-400 dark:bg-clip-text dark:text-transparent">Messages</h2>
@@ -237,7 +238,10 @@ export default function Chat() {
                   <button key={u.id} onClick={() => startDirect(u.user_id)}
                     className="w-full flex items-center gap-[14px] p-3 rounded-2xl hover:bg-gray-100 dark:hover:bg-slate-800/60 hover:shadow-sm transition-all border border-transparent hover:border-gray-200 dark:hover:border-white/10 group">
                     <div className="relative shrink-0">
-                      <Avatar className="h-[52px] w-[52px] shadow-sm"><AvatarFallback className="text-gray-800 text-sm font-semibold" style={{ background: pickBg(u.id) }}>{ini(u.name)}</AvatarFallback></Avatar>
+                      <Avatar className="h-[52px] w-[52px] shadow-sm">
+                        {u.avatar && <AvatarImage src={u.avatar} alt="Profile" className="object-cover" />}
+                        <AvatarFallback className="text-gray-800 text-sm font-semibold" style={{ background: pickBg(u.id) }}>{ini(u.name)}</AvatarFallback>
+                      </Avatar>
                     </div>
                     <div className="text-left min-w-0 flex-1">
                       <div className="text-[16px] font-medium text-gray-800 dark:text-gray-100 truncate group-hover:text-violet-700 dark:group-hover:text-violet-400 transition-colors">{u.name}</div>
@@ -268,7 +272,10 @@ export default function Chat() {
                       const mu = allUsers.find(u => u.user_id === mid);
                       return (
                         <span key={mid} className="inline-flex items-center gap-[6px] pl-1 pr-3 py-1 rounded-full text-[13px] font-medium bg-gray-50 dark:bg-slate-700 shadow-sm border border-gray-200 dark:border-slate-600">
-                          <Avatar className="h-[24px] w-[24px]"><AvatarFallback className="text-[9px] text-gray-800" style={{ background: pickBg(mid) }}>{ini(mu?.name || '')}</AvatarFallback></Avatar>
+                          <Avatar className="h-[24px] w-[24px]">
+                            {mu?.avatar && <AvatarImage src={mu.avatar} alt="Profile" className="object-cover" />}
+                            <AvatarFallback className="text-[9px] text-gray-800" style={{ background: pickBg(mid) }}>{ini(mu?.name || '')}</AvatarFallback>
+                          </Avatar>
                           <span className="text-gray-700 dark:text-gray-200">{mu?.name}</span>
                           <button onClick={() => setSelectedMembers(p => p.filter(x => x !== mid))} className="text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 transition-colors"><X className="h-3.5 w-3.5" /></button>
                         </span>
@@ -291,7 +298,10 @@ export default function Chat() {
                     <button key={u.id} onClick={() => setSelectedMembers(p => sel ? p.filter(x => x !== u.user_id) : [...p, u.user_id])}
                       className={cn("w-full flex items-center gap-[14px] p-3 rounded-2xl transition-all border", sel ? "bg-white dark:bg-slate-700 border-violet-200 dark:border-violet-500/30 shadow-sm" : "border-transparent hover:bg-gray-100 dark:hover:bg-slate-800/60 hover:shadow-sm")}>
                       <div className="relative shrink-0">
-                        <Avatar className="h-[52px] w-[52px] shadow-sm"><AvatarFallback className="text-gray-800 text-sm font-semibold" style={{ background: pickBg(u.id) }}>{ini(u.name)}</AvatarFallback></Avatar>
+                        <Avatar className="h-[52px] w-[52px] shadow-sm">
+                          {u.avatar && <AvatarImage src={u.avatar} alt="Profile" className="object-cover" />}
+                          <AvatarFallback className="text-gray-800 text-sm font-semibold" style={{ background: pickBg(u.id) }}>{ini(u.name)}</AvatarFallback>
+                        </Avatar>
                         {sel && <div className="absolute -bottom-1 -right-1 h-[22px] w-[22px] rounded-full flex items-center justify-center bg-violet-500 border-2 border-white dark:border-slate-800 shadow-sm"><Check className="h-3 w-3 text-white" /></div>}
                       </div>
                       <div className="text-left min-w-0 flex-1">
@@ -339,6 +349,7 @@ export default function Chat() {
                           active ? "bg-white dark:bg-slate-700/80 shadow-md border-white dark:border-slate-600 scale-[1.02]" : "bg-transparent dark:bg-slate-800/30 border-transparent dark:border-white/10 hover:bg-white dark:hover:bg-slate-800/60 hover:shadow-sm hover:scale-[1.01]")}>
                         <div className="relative shrink-0">
                           <Avatar className="h-[52px] w-[52px] shadow-sm">
+                            {partner?.avatar && <AvatarImage src={partner.avatar} alt="Profile" className="object-cover" />}
                             <AvatarFallback className="text-gray-800 text-sm font-semibold" style={{ background: pickBg(seed) }}>
                               {isGroup ? <Users className="h-5 w-5" /> : ini(name)}
                             </AvatarFallback>
@@ -405,6 +416,9 @@ export default function Chat() {
                 </button>
                 <div className="relative">
                   <Avatar className="h-[46px] w-[46px] shadow-md border-2 border-white dark:border-slate-700">
+                    {activeRoom?.room_type !== 'group' && activeRoom?.participants_details?.find((p: any) => p.id !== user?.id)?.avatar && (
+                      <AvatarImage src={activeRoom.participants_details.find((p: any) => p.id !== user?.id)?.avatar} alt="Profile" className="object-cover" />
+                    )}
                     <AvatarFallback className="text-gray-800 text-sm font-semibold" style={{ background: pickBg(activeRoom?.room_type === 'group' ? activeRoom.id : (activeRoom?.participants_details?.find((p: any) => p.id !== user?.id)?.id || activeRoom?.id || '')) }}>
                       {activeRoom?.room_type === 'group' ? <Users className="h-5 w-5" /> : ini(chatName)}
                     </AvatarFallback>

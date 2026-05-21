@@ -280,6 +280,7 @@ async def get_today_attendance(
             "check_out": log.check_out if log else None,
             "breaks": log.breaks if log else [],
             "status": status_str,
+            "avatar_url": emp.avatar_url
         })
         
     return SuccessResponse(

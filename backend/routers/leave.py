@@ -79,11 +79,12 @@ async def get_leaves(
 
     leaves = await Leave.find(query).sort("-created_at").to_list()
     
-    # Enrich with employee names and user ids
+    # Enrich with employee names, user ids, and avatars
     employee_ids = list(set([leave.employee_id for leave in leaves]))
     employees = await Employee.find({"_id": {"$in": employee_ids}}).to_list()
     emp_name_map = {str(emp.id): emp.name for emp in employees}
     emp_user_map = {str(emp.id): str(emp.user_id) if emp.user_id else None for emp in employees}
+    emp_avatar_map = {str(emp.id): emp.avatar_url for emp in employees}
 
     results = []
     for leave in leaves:
@@ -92,6 +93,7 @@ async def get_leaves(
             "employee_id": str(leave.employee_id),
             "employee_user_id": emp_user_map.get(str(leave.employee_id)),
             "employee_name": emp_name_map.get(str(leave.employee_id), "Unknown"),
+            "avatar_url": emp_avatar_map.get(str(leave.employee_id)),
             "leave_type": leave.leave_type,
             "duration_type": getattr(leave, "duration_type", "multiple_days"),
             "start_date": leave.start_date,

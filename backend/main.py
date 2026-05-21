@@ -10,6 +10,9 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 
+from fastapi.staticfiles import StaticFiles
+import os
+
 from config import settings
 from database import init_db, close_db
 from schemas.common import ErrorResponse, ErrorDetail
@@ -44,6 +47,10 @@ app = FastAPI(
     redoc_url="/api/redoc" if settings.APP_ENV != "production" else None,
     openapi_url="/api/openapi.json" if settings.APP_ENV != "production" else None,
 )
+
+# Ensure storage directories exist
+os.makedirs("storage/avatars", exist_ok=True)
+app.mount("/storage", StaticFiles(directory="storage"), name="storage")
 
 # CORS Middleware
 origins = [origin.strip() for origin in settings.ALLOWED_ORIGINS.split(",")]

@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { 
   Plus, 
   Folder,
@@ -397,6 +397,7 @@ export default function Projects() {
                         ];
                         return (
                           <Avatar key={aid} className="h-8 w-8 border-2 border-white dark:border-gray-950 ring-2 ring-transparent group-hover:ring-indigo-100 dark:group-hover:ring-indigo-900/50 transition-all shadow-sm">
+                            {emp?.avatar_url && <AvatarImage src={emp.avatar_url} alt="Profile" className="object-cover" />}
                             <AvatarFallback className={cn("text-[10px] font-black tracking-tighter", colors[idx % colors.length])}>
                               {initials}
                             </AvatarFallback>

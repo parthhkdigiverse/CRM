@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { 
   Users, 
   UserCheck, 
@@ -232,6 +232,7 @@ export default function Employees() {
                   <div className="relative z-10 flex flex-col items-center text-center">
                     <div className="relative mb-4">
                       <Avatar className="h-20 w-20 ring-4 ring-white dark:ring-gray-950 shadow-lg">
+                        {emp.avatar_url && <AvatarImage src={emp.avatar_url} alt="Profile" className="object-cover" />}
                         <AvatarFallback className={cn("text-2xl font-black", colorClass)}>
                           {initials}
                         </AvatarFallback>

@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { 
   Plus, 
   Calendar, 
@@ -223,7 +223,7 @@ export default function Tasks() {
     ];
     let sum = 0;
     for (let i = 0; i < emp.name.length; i++) sum += emp.name.charCodeAt(i);
-    return { name: emp.name, initials, color: colors[sum % colors.length] };
+    return { name: emp.name, initials, color: colors[sum % colors.length], avatar_url: emp.avatar_url };
   };
 
   // Filter tasks based on Search query
@@ -367,6 +367,7 @@ export default function Tasks() {
                             {/* Assignee Avatar */}
                             <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-900 rounded-full pr-3 p-1 border border-gray-100 dark:border-gray-800">
                               <Avatar className="h-6 w-6">
+                                {avatar.avatar_url && <AvatarImage src={avatar.avatar_url} alt="Profile" className="object-cover" />}
                                 <AvatarFallback className={cn("text-[9px] font-black", avatar.color)}>
                                   {avatar.initials}
                                 </AvatarFallback>

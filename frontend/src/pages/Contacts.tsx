@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { 
   Users, UserPlus, Activity, Clock, Search, TrendingUp, Upload, Trash2
 } from 'lucide-react';
@@ -216,6 +216,7 @@ export default function Contacts() {
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           <Avatar className="h-8 w-8">
+                            {c.avatar_url && <AvatarImage src={c.avatar_url} alt="Profile" className="object-cover" />}
                             <AvatarFallback className="bg-purple-100 text-purple-700 text-xs font-semibold dark:bg-purple-900/30 dark:text-purple-300">
                               {fullName.substring(0, 2).toUpperCase()}
                             </AvatarFallback>

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { 
   User, Building2, Bell, Shield, CreditCard, Puzzle, Camera, Loader2, History, Users, MoreVertical
 } from 'lucide-react';
@@ -339,6 +339,7 @@ function TeamMembersView() {
                   <td className="p-4">
                     <div className="flex items-center gap-3">
                       <Avatar className="h-8 w-8">
+                        {member.avatar_url && <AvatarImage src={member.avatar_url} alt="Profile" className="object-cover" />}
                         <AvatarFallback className="bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 text-xs">
                           {member.name.substring(0, 2).toUpperCase()}
                         </AvatarFallback>
@@ -585,17 +586,46 @@ export default function Settings() {
                     {/* Avatar */}
                     <div className="flex items-center gap-6">
                       <div className="relative group">
+                        <input 
+                          type="file" 
+                          accept="image/*" 
+                          className="hidden" 
+                          id="avatar-upload" 
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            
+                            const formData = new FormData();
+                            formData.append('file', file);
+                            
+                            const toastId = toast.loading('Uploading avatar...');
+                            try {
+                              const res = await apiClient.post('/auth/me/avatar', formData, {
+                                headers: { 'Content-Type': 'multipart/form-data' }
+                              });
+                              const newAvatarUrl = res.data.data.avatar_url;
+                              
+                              updateUser({ avatar_url: newAvatarUrl });
+                              toast.success('Avatar uploaded successfully! 🎉', { id: toastId });
+                            } catch (error) {
+                              toast.error('Failed to upload avatar', { id: toastId });
+                            }
+                          }}
+                        />
                         <Avatar className="h-20 w-20">
+                          {useAuthStore.getState().user?.avatar_url && (
+                            <AvatarImage src={useAuthStore.getState().user?.avatar_url} alt="Avatar" className="object-cover" />
+                          )}
                           <AvatarFallback className="bg-gradient-to-br from-purple-500 to-indigo-600 text-white text-xl font-bold">
                             {userInitials}
                           </AvatarFallback>
                         </Avatar>
-                        <div 
+                        <label 
+                          htmlFor="avatar-upload"
                           className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer" 
-                          onClick={() => toast('Upload coming soon!')}
                         >
                           <Camera className="h-5 w-5 text-white" />
-                        </div>
+                        </label>
                       </div>
                       <div>
                         <h3 className="font-semibold text-gray-900 dark:text-white">

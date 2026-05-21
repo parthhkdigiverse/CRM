@@ -194,12 +194,15 @@ export default function Projects() {
   const completedCount = projects.filter(p => p.status === 'completed').length;
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-8">
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
       {/* Header Area */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">Projects</h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">Plan, track and deliver projects with timelines and milestones.</p>
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white flex items-center gap-2">
+            <Folder className="h-8 w-8 text-indigo-600 dark:text-indigo-400" />
+            Project Hub
+          </h1>
+          <p className="text-gray-500 dark:text-gray-400 mt-1 text-sm">Plan, track and deliver projects with timelines and milestones.</p>
         </div>
         <div className="flex items-center gap-3">
           <div className="relative w-full sm:w-64">
@@ -208,13 +211,13 @@ export default function Projects() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search projects..." 
-              className="pl-9 rounded-xl border-gray-200 dark:border-gray-800 h-9 bg-white dark:bg-gray-950 shadow-sm" 
+              className="pl-9 rounded-xl border-gray-200 dark:border-gray-800 h-10 bg-white/50 dark:bg-gray-950/50 backdrop-blur-sm focus:bg-white dark:focus:bg-gray-950 transition-colors shadow-sm" 
             />
           </div>
           {!isEmployee && (
             <Button 
               onClick={() => openDialog(null)}
-              className="bg-purple-600 hover:bg-purple-700 text-white rounded-xl h-9 px-4 active:scale-95 transition-all shadow-sm font-medium"
+              className="bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 shadow-lg shadow-indigo-600/20 text-white rounded-xl h-10 px-5 active:scale-95 transition-all font-medium"
             >
               <Plus className="h-4 w-4 mr-2" /> New Project
             </Button>
@@ -224,55 +227,55 @@ export default function Projects() {
 
       {/* Metrics Cards Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {/* Total Projects */}
-        <Card className="border-0 shadow-sm rounded-2xl bg-white dark:bg-gray-950">
-          <CardContent className="p-5 flex justify-between items-start">
-            <div className="space-y-2">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Projects</p>
-              <div className="text-3xl font-bold">{totalCount}</div>
-            </div>
+        <Card className="border border-gray-100 dark:border-gray-800 shadow-sm rounded-2xl bg-white dark:bg-gray-950 overflow-hidden relative group">
+          <div className="absolute top-0 right-0 p-4 opacity-50 group-hover:opacity-100 transition-opacity">
             <div className="h-10 w-10 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
               <Folder className="h-5 w-5 text-purple-600 dark:text-purple-400" />
             </div>
+          </div>
+          <CardContent className="p-5">
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Total Projects</p>
+            <div className="text-3xl font-black mt-2 mb-1">{totalCount}</div>
+            <p className="text-xs font-medium text-gray-500">All time records</p>
           </CardContent>
         </Card>
 
-        {/* Active Projects */}
-        <Card className="border-0 shadow-sm rounded-2xl bg-white dark:bg-gray-950">
-          <CardContent className="p-5 flex justify-between items-start">
-            <div className="space-y-2">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Active</p>
-              <div className="text-3xl font-bold">{activeCount}</div>
-            </div>
+        <Card className="border border-gray-100 dark:border-gray-800 shadow-sm rounded-2xl bg-white dark:bg-gray-950 overflow-hidden relative group">
+          <div className="absolute top-0 right-0 p-4 opacity-50 group-hover:opacity-100 transition-opacity">
             <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
               <Clock className="h-5 w-5 text-blue-600 dark:text-blue-400" />
             </div>
+          </div>
+          <CardContent className="p-5">
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Active</p>
+            <div className="text-3xl font-black mt-2 mb-1">{activeCount}</div>
+            <p className="text-xs font-medium text-blue-500">Currently in progress</p>
           </CardContent>
         </Card>
 
-        {/* Completed Projects */}
-        <Card className="border-0 shadow-sm rounded-2xl bg-white dark:bg-gray-950">
-          <CardContent className="p-5 flex justify-between items-start">
-            <div className="space-y-2">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Completed</p>
-              <div className="text-3xl font-bold">{completedCount}</div>
-            </div>
+        <Card className="border border-gray-100 dark:border-gray-800 shadow-sm rounded-2xl bg-white dark:bg-gray-950 overflow-hidden relative group">
+          <div className="absolute top-0 right-0 p-4 opacity-50 group-hover:opacity-100 transition-opacity">
             <div className="h-10 w-10 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
               <CheckCircle className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
             </div>
+          </div>
+          <CardContent className="p-5">
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Completed</p>
+            <div className="text-3xl font-black mt-2 mb-1">{completedCount}</div>
+            <p className="text-xs font-medium text-emerald-500">Successfully delivered</p>
           </CardContent>
         </Card>
 
-        {/* Total Budget */}
-        <Card className="border-0 shadow-sm rounded-2xl bg-white dark:bg-gray-950">
-          <CardContent className="p-5 flex justify-between items-start">
-            <div className="space-y-2">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Budget</p>
-              <div className="text-3xl font-bold">{totalBudgetFormatted}</div>
-            </div>
+        <Card className="border border-gray-100 dark:border-gray-800 shadow-sm rounded-2xl bg-white dark:bg-gray-950 overflow-hidden relative group">
+          <div className="absolute top-0 right-0 p-4 opacity-50 group-hover:opacity-100 transition-opacity">
             <div className="h-10 w-10 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
               <Wallet className="h-5 w-5 text-orange-600 dark:text-orange-400" />
             </div>
+          </div>
+          <CardContent className="p-5">
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Total Budget</p>
+            <div className="text-3xl font-black mt-2 mb-1">{totalBudgetFormatted}</div>
+            <p className="text-xs font-medium text-orange-500">Allocated capital</p>
           </CardContent>
         </Card>
       </div>
@@ -299,17 +302,19 @@ export default function Projects() {
 
       {/* Projects Grid */}
       {loading ? (
-        <div className="flex justify-center items-center py-24 text-gray-500 gap-2">
-          <Loader2 className="h-5 w-5 animate-spin text-purple-600" />
-          Loading Projects...
+        <div className="flex justify-center items-center py-32 text-gray-500 gap-3">
+          <Loader2 className="h-6 w-6 animate-spin text-indigo-600" />
+          <span className="font-semibold text-sm tracking-wide">Loading Projects...</span>
         </div>
       ) : filteredProjects.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center bg-white dark:bg-gray-950 rounded-2xl border border-dashed border-gray-200 dark:border-gray-800">
-          <Folder className="h-10 w-10 text-gray-400 mb-3" />
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white">No projects found</h3>
-          <p className="text-gray-500 max-w-sm mt-1">Get started by creating your first client project.</p>
+        <div className="flex flex-col items-center justify-center py-24 text-center bg-white dark:bg-gray-950 rounded-3xl border border-dashed border-gray-200 dark:border-gray-800">
+          <div className="h-16 w-16 bg-gray-50 dark:bg-gray-900 rounded-full flex items-center justify-center mb-4">
+            <Folder className="h-8 w-8 text-gray-400" />
+          </div>
+          <h3 className="text-xl font-bold text-gray-900 dark:text-white">No projects found</h3>
+          <p className="text-sm text-gray-500 max-w-sm mt-2">Get started by creating your first client project or internal initiative.</p>
           {!isEmployee && (
-            <Button onClick={() => openDialog(null)} className="mt-4 bg-purple-600 hover:bg-purple-700 text-white rounded-xl">
+            <Button onClick={() => openDialog(null)} className="mt-6 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white rounded-xl shadow-lg shadow-indigo-500/20 px-6">
               <Plus className="h-4 w-4 mr-2" /> New Project
             </Button>
           )}
@@ -322,68 +327,77 @@ export default function Projects() {
               <div
                 key={project.id}
                 onClick={() => openDialog(project)}
-                className="bg-white dark:bg-gray-950 border border-gray-100 dark:border-gray-900 rounded-2xl p-5 shadow-[0_2px_8px_-3px_rgba(0,0,0,0.05)] hover:shadow-md cursor-pointer hover:border-purple-200 dark:hover:border-purple-900 transition-all duration-200 group relative"
+                className="bg-white dark:bg-gray-950 border border-gray-100 dark:border-gray-900 rounded-3xl p-6 shadow-sm hover:shadow-xl hover:shadow-indigo-500/5 hover:-translate-y-1 hover:border-indigo-200 dark:hover:border-indigo-900 cursor-pointer transition-all duration-300 group relative overflow-hidden"
               >
+                {/* Subtle glass gradient on hover */}
+                <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+
                 {/* Trash Action */}
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     handleDelete(project.id);
                   }}
-                  className="absolute top-4 right-4 h-7 w-7 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/30 flex items-center justify-center text-gray-300 group-hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all duration-150"
+                  className="absolute top-5 right-5 h-8 w-8 rounded-xl hover:bg-rose-50 dark:hover:bg-rose-950/30 flex items-center justify-center text-gray-300 group-hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all duration-200 z-10"
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>
 
                 {/* Card Top: Code and Status */}
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{project.project_code}</span>
-                  <span className={cn("px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-wider border", statusCfg.color)}>
+                <div className="flex items-center justify-between mb-5 relative z-10">
+                  <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-900 px-2.5 py-1 rounded-lg border border-gray-200 dark:border-gray-800">
+                    <Folder className="h-3 w-3 text-gray-400" />
+                    <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">{project.project_code}</span>
+                  </div>
+                  <span className={cn("px-2.5 py-1 rounded-md text-[10px] font-extrabold uppercase tracking-wider border", statusCfg.color)}>
                     {statusCfg.label}
                   </span>
                 </div>
 
                 {/* Card Main: Title & Client */}
-                <div className="mt-4">
-                  <h3 className="text-sm font-bold text-gray-900 dark:text-white group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
+                <div className="mb-6 relative z-10">
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors leading-tight">
                     {project.title}
                   </h3>
-                  <p className="text-[11px] text-gray-500 font-medium mt-0.5">{project.client_name || 'Internal'}</p>
+                  <div className="flex items-center gap-1.5 mt-2">
+                    <div className="h-1.5 w-1.5 rounded-full bg-gray-300 dark:bg-gray-700" />
+                    <p className="text-xs text-gray-500 font-semibold">{project.client_name || 'Internal Project'}</p>
+                  </div>
                 </div>
 
                 {/* Progress Slider */}
-                <div className="mt-6 space-y-1.5">
-                  <div className="flex justify-between items-center text-[10px] font-semibold text-gray-500">
-                    <span>Progress</span>
-                    <span>{project.progress}%</span>
+                <div className="space-y-2 mb-6 relative z-10">
+                  <div className="flex justify-between items-end">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Progress</span>
+                    <span className="text-xs font-black text-gray-700 dark:text-gray-300">{project.progress}%</span>
                   </div>
-                  <div className="w-full h-2 bg-gray-100 dark:bg-gray-900 rounded-full overflow-hidden">
+                  <div className="w-full h-2.5 bg-gray-100 dark:bg-gray-900 rounded-full overflow-hidden shadow-inner">
                     <div 
-                      className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full"
+                      className="h-full bg-gradient-to-r from-indigo-500 via-blue-500 to-sky-400 rounded-full shadow-[0_0_10px_rgba(99,102,241,0.5)]"
                       style={{ width: `${project.progress}%` }}
                     />
                   </div>
                 </div>
 
                 {/* Card Footer: Assignee Stack & Info */}
-                <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-50 dark:border-gray-900/50">
+                <div className="flex items-center justify-between pt-5 border-t border-gray-100 dark:border-gray-900/50 relative z-10">
                   {/* Assignee Avatar Initials Stack */}
-                  <div className="flex -space-x-1.5 overflow-hidden">
+                  <div className="flex -space-x-2 overflow-hidden hover:-space-x-1 transition-all duration-300 p-1">
                     {project.assignee_ids.length === 0 ? (
-                      <span className="text-[10px] text-gray-400 font-medium">Unassigned</span>
+                      <span className="text-[10px] text-gray-400 font-medium px-1">Unassigned</span>
                     ) : (
                       project.assignee_ids.slice(0, 3).map((aid: string, idx: number) => {
                         const emp = employees.find(e => e.id === aid);
                         const name = emp ? emp.name : 'User';
                         const initials = name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase();
                         const colors = [
-                          'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300',
                           'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300',
-                          'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
+                          'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
+                          'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300'
                         ];
                         return (
-                          <Avatar key={aid} className="h-6 w-6 border-2 border-white dark:border-gray-950">
-                            <AvatarFallback className={cn("text-[9px] font-extrabold", colors[idx % colors.length])}>
+                          <Avatar key={aid} className="h-8 w-8 border-2 border-white dark:border-gray-950 ring-2 ring-transparent group-hover:ring-indigo-100 dark:group-hover:ring-indigo-900/50 transition-all shadow-sm">
+                            <AvatarFallback className={cn("text-[10px] font-black tracking-tighter", colors[idx % colors.length])}>
                               {initials}
                             </AvatarFallback>
                           </Avatar>
@@ -391,23 +405,23 @@ export default function Projects() {
                       })
                     )}
                     {project.assignee_ids.length > 3 && (
-                      <div className="h-6 w-6 rounded-full bg-gray-100 dark:bg-gray-900 border-2 border-white dark:border-gray-950 flex items-center justify-center text-[9px] font-bold text-gray-500">
+                      <div className="h-8 w-8 rounded-full bg-gray-100 dark:bg-gray-900 border-2 border-white dark:border-gray-950 flex items-center justify-center text-[10px] font-black text-gray-500 shadow-sm z-10 relative">
                         +{project.assignee_ids.length - 3}
                       </div>
                     )}
                   </div>
 
                   {/* Date & Cost details */}
-                  <div className="flex items-center gap-3 text-[10px] text-gray-400 font-semibold">
+                  <div className="flex flex-col items-end gap-1">
+                    <span className="text-sm text-gray-900 dark:text-gray-100 font-black tracking-tight">
+                      {formatINRCompact(project.budget || 0)}
+                    </span>
                     {project.end_date && (
-                      <span className="flex items-center gap-0.5">
-                        <Calendar className="h-3.5 w-3.5" />
+                      <span className="flex items-center gap-1 text-[10px] text-gray-400 font-semibold">
+                        <Calendar className="h-3 w-3" />
                         {new Date(project.end_date).toISOString().split('T')[0]}
                       </span>
                     )}
-                    <span className="text-gray-600 dark:text-gray-300 font-bold">
-                      {formatINRCompact(project.budget || 0)}
-                    </span>
                   </div>
                 </div>
               </div>

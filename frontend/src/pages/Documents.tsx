@@ -22,10 +22,14 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
 import { apiClient } from '@/lib/axios';
+import { useAuthStore } from '@/store/authStore';
 
-const foldersList = ['All', 'Finance', 'HR', 'Sales', 'Marketing', 'Legal'];
+const foldersList = ['All', 'Personal', 'Finance', 'HR', 'Sales', 'Marketing', 'Legal'];
 
 export default function Documents() {
+  const { user } = useAuthStore();
+  const isEmployee = user?.role === 'employee';
+  
   const [documents, setDocuments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -443,21 +447,23 @@ export default function Documents() {
               </div>
 
               {/* Share Checkbox */}
-              <div className="flex items-center gap-2.5 py-1">
-                <input
-                  type="checkbox"
-                  id="is_shared_upload"
-                  checked={isSharedToUpload}
-                  onChange={(e) => setIsSharedToUpload(e.target.checked)}
-                  className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500 dark:border-gray-800 dark:bg-gray-950"
-                />
-                <label 
-                  htmlFor="is_shared_upload" 
-                  className="text-xs font-bold text-gray-500 uppercase tracking-wider cursor-pointer"
-                >
-                  Share with team members
-                </label>
-              </div>
+              {!isEmployee && (
+                <div className="flex items-center gap-2.5 py-1">
+                  <input
+                    type="checkbox"
+                    id="is_shared_upload"
+                    checked={isSharedToUpload}
+                    onChange={(e) => setIsSharedToUpload(e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500 dark:border-gray-800 dark:bg-gray-950"
+                  />
+                  <label 
+                    htmlFor="is_shared_upload" 
+                    className="text-xs font-bold text-gray-500 uppercase tracking-wider cursor-pointer"
+                  >
+                    Share with team members
+                  </label>
+                </div>
+              )}
 
               {/* Form Actions */}
               <div className="flex gap-3 justify-end pt-4 border-t border-gray-100 dark:border-gray-900 mt-2">

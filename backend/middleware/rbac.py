@@ -32,7 +32,7 @@ ROLE_PERMISSIONS = {
     'employee': {
         'contacts': 'read', 'companies': 'read', 'projects': 'own',
         'tasks': 'own', 'attendance': 'own', 'targets': 'own',
-        'meetings': 'own', 'documents': 'read', 'ai': 'full',
+        'meetings': 'own', 'documents': 'own', 'ai': 'full',
         'payroll': 'own', 'employees': 'read',
     },
 }

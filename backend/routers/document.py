@@ -104,6 +104,13 @@ async def list_documents(
     if search:
         query["name"] = {"$regex": search, "$options": "i"}
 
+    # Employees can only see their own documents or shared documents
+    if current_user.role == "employee":
+        query["$or"] = [
+            {"uploaded_by": current_user.id},
+            {"is_shared": True}
+        ]
+
     docs = await DocumentModel.find(query).sort("-uploaded_at").to_list()
 
     data = []
@@ -148,6 +155,9 @@ async def delete_document(
     )
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
+
+    if current_user.role == "employee" and str(doc.uploaded_by) != str(current_user.id):
+        raise HTTPException(status_code=403, detail="You can only delete your own documents")
 
     # Mark as deleted in database
     doc.is_deleted = True

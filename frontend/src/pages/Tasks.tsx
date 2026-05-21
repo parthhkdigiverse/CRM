@@ -240,12 +240,15 @@ export default function Tasks() {
   ];
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-8">
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12 h-[calc(100vh-6rem)] flex flex-col">
       {/* Header Area */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">Tasks</h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">Kanban board across teams and projects.</p>
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white flex items-center gap-2">
+            <CheckCircle className="h-8 w-8 text-pink-600 dark:text-pink-400" />
+            Task Board
+          </h1>
+          <p className="text-gray-500 dark:text-gray-400 mt-1 text-sm">Agile Kanban board to track workflow across teams and projects.</p>
         </div>
         <div className="flex items-center gap-3">
           {/* Search bar */}
@@ -255,13 +258,13 @@ export default function Tasks() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search tasks..." 
-              className="pl-9 rounded-xl border-gray-200 dark:border-gray-800 h-9 bg-white dark:bg-gray-950 shadow-sm" 
+              className="pl-9 rounded-xl border-gray-200 dark:border-gray-800 h-10 bg-white/50 dark:bg-gray-950/50 backdrop-blur-sm focus:bg-white dark:focus:bg-gray-950 transition-colors shadow-sm" 
             />
           </div>
           {!isEmployee && (
             <Button 
               onClick={() => openDialog(null, 'todo')}
-              className="bg-purple-600 hover:bg-purple-700 text-white rounded-xl h-9 px-4 active:scale-95 transition-all shadow-sm font-medium"
+              className="bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-700 hover:to-rose-700 shadow-lg shadow-pink-600/20 text-white rounded-xl h-10 px-5 active:scale-95 transition-all font-medium"
             >
               <Plus className="h-4 w-4 mr-2" /> New Task
             </Button>
@@ -271,12 +274,12 @@ export default function Tasks() {
 
       {/* Kanban Grid */}
       {loading ? (
-        <div className="flex justify-center items-center py-24 text-gray-500 gap-2">
-          <Loader2 className="h-5 w-5 animate-spin text-purple-600" />
-          Loading Kanban board...
+        <div className="flex justify-center items-center flex-1 text-gray-500 gap-3">
+          <Loader2 className="h-6 w-6 animate-spin text-pink-600" />
+          <span className="font-semibold text-sm tracking-wide">Loading Kanban board...</span>
         </div>
       ) : (
-        <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-4 items-start">
+        <div className="flex-1 grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-4 items-start min-h-0 overflow-hidden pb-4">
           {columns.map((col) => {
             const colTasks = filteredTasks.filter(t => t.status === col.id);
             return (
@@ -286,23 +289,25 @@ export default function Tasks() {
                 onDragLeave={() => setDraggedOverColumn(null)}
                 onDrop={(e) => handleDrop(e, col.id)}
                 className={cn(
-                  "bg-gray-50/50 dark:bg-gray-950/20 border border-transparent rounded-2xl p-4 flex flex-col min-h-[550px] transition-colors duration-200",
-                  draggedOverColumn === col.id && "bg-purple-50/40 dark:bg-purple-950/5 border-dashed border-purple-300 dark:border-purple-800"
+                  "bg-gray-50/80 dark:bg-gray-900/40 backdrop-blur-sm border rounded-[24px] p-4 flex flex-col h-full max-h-full overflow-hidden transition-all duration-300",
+                  draggedOverColumn === col.id 
+                    ? "border-pink-300 dark:border-pink-800 bg-pink-50/40 dark:bg-pink-950/20 shadow-inner"
+                    : "border-gray-200/50 dark:border-gray-800/50 shadow-sm"
                 )}
               >
                 {/* Column Header */}
-                <div className="flex items-center justify-between mb-4 px-1">
-                  <div className="flex items-center gap-2">
-                    <span className={cn("h-2.5 w-2.5 rounded-full", col.dot)} />
-                    <h3 className="font-bold text-sm text-gray-900 dark:text-white">{col.label}</h3>
-                    <span className="bg-gray-100 dark:bg-gray-900 text-gray-500 dark:text-gray-400 text-xs font-bold px-2 py-0.5 rounded-full">
+                <div className="flex items-center justify-between mb-5 px-2 shrink-0">
+                  <div className="flex items-center gap-2.5">
+                    <span className={cn("h-3 w-3 rounded-full shadow-sm", col.dot)} />
+                    <h3 className="font-bold text-[15px] text-gray-900 dark:text-white">{col.label}</h3>
+                    <span className="bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-xs font-black px-2 py-0.5 rounded-full shadow-sm border border-gray-100 dark:border-gray-700">
                       {colTasks.length}
                     </span>
                   </div>
                   {!isEmployee && (
                     <button 
                       onClick={() => openDialog(null, col.id)}
-                      className="h-6 w-6 rounded-md hover:bg-gray-200/50 dark:hover:bg-gray-800/50 flex items-center justify-center text-gray-400 hover:text-gray-700 transition-colors"
+                      className="h-8 w-8 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 shadow-sm hover:bg-pink-50 dark:hover:bg-pink-950/30 flex items-center justify-center text-gray-400 hover:text-pink-600 transition-colors"
                     >
                       <Plus className="h-4 w-4" />
                     </button>
@@ -310,10 +315,10 @@ export default function Tasks() {
                 </div>
 
                 {/* Column Card Stack */}
-                <div className="space-y-3 flex-1 overflow-y-auto">
+                <div className="space-y-3.5 flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700 pb-2 px-1">
                   {colTasks.length === 0 ? (
-                    <div className="h-32 border border-dashed border-gray-200 dark:border-gray-800 rounded-xl flex items-center justify-center text-center p-4 text-[11px] text-gray-400">
-                      Drag tasks here
+                    <div className="h-32 border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-2xl flex items-center justify-center text-center p-4 text-[13px] font-medium text-gray-400 bg-white/50 dark:bg-gray-950/50">
+                      Drop tasks here
                     </div>
                   ) : (
                     colTasks.map((task) => {
@@ -327,7 +332,7 @@ export default function Tasks() {
                           draggable
                           onDragStart={(e) => handleDragStart(e, task.id)}
                           onClick={() => openDialog(task)}
-                          className="bg-white dark:bg-gray-950 border border-gray-100 dark:border-gray-900 rounded-xl p-4 shadow-[0_2px_8px_-3px_rgba(0,0,0,0.05)] hover:shadow-md cursor-pointer hover:border-purple-200 dark:hover:border-purple-900 transition-all duration-200 group relative"
+                          className="bg-white dark:bg-gray-950 border border-gray-200/60 dark:border-gray-800 rounded-2xl p-4 shadow-sm hover:shadow-lg hover:shadow-pink-500/5 hover:-translate-y-0.5 hover:border-pink-200 dark:hover:border-pink-900/50 transition-all duration-300 group relative cursor-grab active:cursor-grabbing"
                         >
                           {/* Hover Actions */}
                           {!isEmployee && (
@@ -336,57 +341,62 @@ export default function Tasks() {
                                 e.stopPropagation();
                                 handleDelete(task.id);
                               }}
-                              className="absolute top-3 right-3 h-6 w-6 rounded-md hover:bg-rose-50 dark:hover:bg-rose-950/30 flex items-center justify-center text-gray-300 group-hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all duration-150"
+                              className="absolute top-4 right-4 h-7 w-7 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/30 flex items-center justify-center text-gray-300 group-hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all duration-200"
                             >
-                              <Trash2 className="h-3.5 w-3.5" />
+                              <Trash2 className="h-4 w-4" />
                             </button>
                           )}
 
                           {/* Card Tags */}
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className={cn("px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border", categoryColor)}>
+                          <div className="flex items-center gap-2 flex-wrap mb-3">
+                            <span className={cn("px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-widest border", categoryColor)}>
                               {task.linked_type || 'Design'}
                             </span>
-                            <span className={cn("px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border", priorityColor)}>
+                            <span className={cn("px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-widest border", priorityColor)}>
                               {task.priority === 'high' ? 'High' : task.priority === 'low' ? 'Low' : 'Med'}
                             </span>
                           </div>
 
                           {/* Task Title */}
-                          <h4 className="font-semibold text-xs leading-relaxed text-gray-900 dark:text-white mt-3 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
+                          <h4 className="font-bold text-sm leading-snug text-gray-900 dark:text-white group-hover:text-pink-600 dark:group-hover:text-pink-400 transition-colors line-clamp-3">
                             {task.title}
                           </h4>
 
                           {/* Card Footer */}
-                          <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-50 dark:border-gray-900/50">
+                          <div className="flex items-end justify-between mt-5">
                             {/* Assignee Avatar */}
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-900 rounded-full pr-3 p-1 border border-gray-100 dark:border-gray-800">
                               <Avatar className="h-6 w-6">
-                                <AvatarFallback className={cn("text-[9px] font-extrabold", avatar.color)}>
+                                <AvatarFallback className={cn("text-[9px] font-black", avatar.color)}>
                                   {avatar.initials}
                                 </AvatarFallback>
                               </Avatar>
-                              <span className="text-[10px] text-gray-500 font-semibold truncate max-w-[70px]">
+                              <span className="text-[10px] text-gray-600 dark:text-gray-400 font-bold truncate max-w-[70px]">
                                 {avatar.name.split(' ')[0]}
                               </span>
                             </div>
 
                             {/* Card Stats */}
-                            <div className="flex items-center gap-2.5 text-[10px] text-gray-400 font-semibold">
+                            <div className="flex flex-col items-end gap-1.5 text-[10px] text-gray-400 font-bold">
                               {task.due_date && (
-                                <span className="flex items-center gap-0.5">
+                                <span className={cn(
+                                  "flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-50 dark:bg-gray-900",
+                                  new Date(task.due_date) < new Date() ? "text-rose-600 bg-rose-50 dark:bg-rose-950/30" : ""
+                                )}>
                                   <Calendar className="h-3 w-3" />
                                   {formatDateDisplay(task.due_date)}
                                 </span>
                               )}
-                              <span className="flex items-center gap-0.5">
-                                <MessageSquare className="h-3 w-3" />
-                                {task.comments?.length || 0}
-                              </span>
-                              <span className="flex items-center gap-0.5">
-                                <Paperclip className="h-3 w-3" />
-                                {(task.title.length % 3) + 1}
-                              </span>
+                              <div className="flex items-center gap-2">
+                                <span className="flex items-center gap-0.5">
+                                  <MessageSquare className="h-3 w-3" />
+                                  {task.comments?.length || 0}
+                                </span>
+                                <span className="flex items-center gap-0.5">
+                                  <Paperclip className="h-3 w-3" />
+                                  {(task.title.length % 3) + 1}
+                                </span>
+                              </div>
                             </div>
                           </div>
                         </div>

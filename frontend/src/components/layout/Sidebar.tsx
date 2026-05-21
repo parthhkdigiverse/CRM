@@ -52,7 +52,7 @@ const navigation = [
       { name: 'Projects', href: '/projects', icon: Folder, isComingSoon: false, allowedRoles: ['super_admin', 'admin', 'hr', 'employee'] },
       { name: 'Tasks', href: '/tasks', icon: CheckSquare, isComingSoon: false, allowedRoles: ['super_admin', 'admin', 'hr', 'employee'] },
       { name: 'Calendar', href: '/calendar', icon: CalendarDays, isComingSoon: false, allowedRoles: ['super_admin', 'admin', 'hr', 'employee'] },
-      { name: 'Documents', href: '/documents', icon: FileText, isComingSoon: false, allowedRoles: ['super_admin', 'admin', 'hr'] },
+      { name: 'Documents', href: '/documents', icon: FileText, isComingSoon: false, allowedRoles: ['super_admin', 'admin', 'hr', 'employee'] },
     ]
   },
   {

@@ -78,24 +78,27 @@ export default function Employees() {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-8">
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">HRMS</h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">Employees, attendance, leaves and payroll.</p>
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white flex items-center gap-2">
+            <Users className="h-8 w-8 text-purple-600 dark:text-purple-400" />
+            HRMS Hub
+          </h1>
+          <p className="text-gray-500 dark:text-gray-400 mt-1 text-sm">Manage your team, track performance, and handle HR operations.</p>
         </div>
         <div className="flex items-center gap-3">
           <Button 
             variant="outline" 
-            className="bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800 rounded-xl h-9"
+            className="bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800 rounded-xl h-10 hover:border-purple-300 hover:bg-purple-50 dark:hover:bg-purple-950/30 transition-colors"
             onClick={() => toast('Filters coming soon!')}
           >
             <SlidersHorizontal className="h-4 w-4 mr-2 text-gray-500" />
-            Filter
+            Filter Team
           </Button>
           <Button 
-            className="bg-purple-600 hover:bg-purple-700 text-white rounded-xl h-9 px-4"
+            className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 shadow-lg shadow-purple-600/20 text-white rounded-xl h-10 px-5 transition-all active:scale-95"
             onClick={() => setDialogOpen(true)}
           >
             <Plus className="h-4 w-4 mr-2" /> Add Employee
@@ -103,199 +106,182 @@ export default function Employees() {
         </div>
       </div>
 
+      {/* Quick HR Tools Banner (Horizontal) */}
+      <div className="bg-gradient-to-r from-gray-900 via-indigo-900 to-purple-900 text-white rounded-2xl p-6 shadow-xl relative overflow-hidden flex flex-col sm:flex-row items-center justify-between gap-6">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl pointer-events-none transform translate-x-1/3 -translate-y-1/3" />
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-purple-500/20 rounded-full blur-2xl pointer-events-none transform -translate-x-1/2 translate-y-1/2" />
+        
+        <div className="relative z-10">
+          <h2 className="text-lg font-bold flex items-center gap-2">
+            <Briefcase className="h-5 w-5 text-purple-300" />
+            Quick HR Actions
+          </h2>
+          <p className="text-sm text-gray-300 mt-1 max-w-md">Access commonly used HR tools and document generators instantly.</p>
+        </div>
+        
+        <div className="flex flex-wrap items-center gap-3 relative z-10">
+          {[
+            { label: 'Offer Letter', icon: FileText },
+            { label: 'ID Card', icon: CreditCard },
+            { label: 'Payslip', icon: FileText },
+          ].map((tool, i) => (
+            <button 
+              key={i} 
+              onClick={() => toast(`${tool.label} generation coming soon!`)}
+              className="flex items-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/20 border border-white/10 hover:border-white/20 rounded-xl text-sm font-semibold tracking-wide transition-all duration-300 hover:scale-105 active:scale-95 backdrop-blur-sm"
+            >
+              <tool.icon className="h-4 w-4 opacity-80" />
+              <span>{tool.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Metric Cards Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {/* Total Employees */}
-        <Card className="border-0 shadow-sm rounded-2xl bg-white dark:bg-gray-950">
-          <CardContent className="p-5 flex justify-between items-start">
-            <div className="space-y-2">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Employees</p>
-              <div className="text-3xl font-bold">{totalEmployeesCount}</div>
-              <p className="text-xs font-medium text-emerald-500 flex items-center">
-                <TrendingUp className="h-3 w-3 mr-1" /> Live records
-              </p>
-            </div>
+        <Card className="border border-gray-100 dark:border-gray-800 shadow-sm rounded-2xl bg-white dark:bg-gray-950 overflow-hidden relative group">
+          <div className="absolute top-0 right-0 p-4 opacity-50 group-hover:opacity-100 transition-opacity">
             <div className="h-10 w-10 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
               <Users className="h-5 w-5 text-purple-600 dark:text-purple-400" />
             </div>
+          </div>
+          <CardContent className="p-5">
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Total Headcount</p>
+            <div className="text-3xl font-black mt-2 mb-1">{totalEmployeesCount}</div>
+            <p className="text-xs font-medium text-emerald-500 flex items-center">
+              <TrendingUp className="h-3 w-3 mr-1" /> Active directory
+            </p>
           </CardContent>
         </Card>
 
-        {/* Present Today */}
-        <Card className="border-0 shadow-sm rounded-2xl bg-white dark:bg-gray-950">
-          <CardContent className="p-5 flex justify-between items-start">
-            <div className="space-y-2">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Active Employees</p>
-              <div className="text-3xl font-bold">{activeCount}</div>
-              <p className="text-xs font-medium text-emerald-500 flex items-center">
-                <TrendingUp className="h-3 w-3 mr-1" /> Active status
-              </p>
-            </div>
+        <Card className="border border-gray-100 dark:border-gray-800 shadow-sm rounded-2xl bg-white dark:bg-gray-950 overflow-hidden relative group">
+          <div className="absolute top-0 right-0 p-4 opacity-50 group-hover:opacity-100 transition-opacity">
             <div className="h-10 w-10 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
               <UserCheck className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
             </div>
+          </div>
+          <CardContent className="p-5">
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Active Status</p>
+            <div className="text-3xl font-black mt-2 mb-1">{activeCount}</div>
+            <p className="text-xs font-medium text-emerald-500 flex items-center">
+              <TrendingUp className="h-3 w-3 mr-1" /> Available to work
+            </p>
           </CardContent>
         </Card>
 
-        {/* On Leave */}
-        <Card className="border-0 shadow-sm rounded-2xl bg-white dark:bg-gray-950">
-          <CardContent className="p-5 flex justify-between items-start">
-            <div className="space-y-2">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">On Leave</p>
-              <div className="text-3xl font-bold">{onLeaveCount}</div>
-              <p className="text-xs font-medium text-orange-500">On-leave status</p>
-            </div>
+        <Card className="border border-gray-100 dark:border-gray-800 shadow-sm rounded-2xl bg-white dark:bg-gray-950 overflow-hidden relative group">
+          <div className="absolute top-0 right-0 p-4 opacity-50 group-hover:opacity-100 transition-opacity">
             <div className="h-10 w-10 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
               <UserX className="h-5 w-5 text-orange-600 dark:text-orange-400" />
             </div>
+          </div>
+          <CardContent className="p-5">
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">On Leave</p>
+            <div className="text-3xl font-black mt-2 mb-1">{onLeaveCount}</div>
+            <p className="text-xs font-medium text-orange-500">Currently out of office</p>
           </CardContent>
         </Card>
 
-        {/* Top Performer */}
-        <Card className="border-0 shadow-sm rounded-2xl bg-white dark:bg-gray-950">
-          <CardContent className="p-5 flex justify-between items-start">
-            <div className="space-y-2">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Top Performer</p>
-              <div className="text-2xl font-bold tracking-tight mt-1 truncate max-w-[150px]">{topPerformer}</div>
-              <p className="text-xs font-medium text-purple-600 dark:text-purple-400">{topPerformerDept}</p>
-            </div>
+        <Card className="border border-gray-100 dark:border-gray-800 shadow-sm rounded-2xl bg-white dark:bg-gray-950 overflow-hidden relative group">
+          <div className="absolute top-0 right-0 p-4 opacity-50 group-hover:opacity-100 transition-opacity">
             <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
               <Award className="h-5 w-5 text-blue-600 dark:text-blue-400" />
             </div>
+          </div>
+          <CardContent className="p-5">
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Top Performer</p>
+            <div className="text-xl font-black mt-3 mb-1 truncate max-w-[150px]">{topPerformer}</div>
+            <p className="text-xs font-medium text-blue-500">{topPerformerDept}</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Main Grid: Directory on Left, Leaves and Tools on Right */}
-      <div className="grid gap-6 md:grid-cols-3">
-        {/* Employee Directory Column */}
-        <div className="md:col-span-2">
-          <Card className="border-0 shadow-sm rounded-2xl bg-white dark:bg-gray-950">
-            <div className="p-6 pb-3 border-b border-gray-50 dark:border-gray-900 flex justify-between items-center">
-              <h2 className="text-lg font-bold text-gray-900 dark:text-white">Employee Directory</h2>
-              <button 
-                onClick={() => toast('Viewing all employees')}
-                className="text-sm font-semibold text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 hover:underline cursor-pointer transition-all"
-              >
-                View all
-              </button>
-            </div>
-            <div className="divide-y divide-gray-100 dark:divide-gray-900 px-2 pb-4">
-              {loading ? (
-                <div className="flex justify-center py-12 text-gray-500">Loading Directory...</div>
-              ) : employees.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 text-center">
-                  <Inbox className="h-10 w-10 text-gray-400 mb-3" />
-                  <h3 className="text-sm font-bold text-gray-900 dark:text-white">No employees found</h3>
-                  <p className="text-xs text-gray-500 mt-1">Add your first employee to get started.</p>
-                </div>
-              ) : (
-                employees.map((emp) => {
-                  const initials = emp.name ? emp.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : 'EM';
-                  const isLeave = emp.status === 'on_leave';
-                  const colorClass = getInitialsColor(emp.name);
-                  
-                  return (
-                    <div key={emp.id} className="flex items-center justify-between p-4 hover:bg-gray-50/50 dark:hover:bg-gray-900/50 rounded-xl transition-all duration-200">
-                      <div className="flex items-center gap-4">
-                        <Avatar className="h-10 w-10">
-                          <AvatarFallback className={cn("font-bold text-xs", colorClass)}>
-                            {initials}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h3 className="font-semibold text-gray-900 dark:text-gray-100 text-sm">{emp.name}</h3>
-                            <span className={cn(
-                              "px-2 py-0.5 rounded-full text-[9px] font-semibold tracking-wide border",
-                              isLeave 
-                                ? "bg-orange-50 text-orange-600 border-orange-100 dark:bg-orange-950/40 dark:text-orange-400 dark:border-orange-900/50" 
-                                : "bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/50"
-                            )}>
-                              {isLeave ? 'On Leave' : 'Active'}
-                            </span>
-                          </div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                            {emp.role || 'Designation'} · {emp.department || 'Department'} · Joined {formatDate(emp.join_date)}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-8 w-8 rounded-lg hover:bg-purple-50 hover:text-purple-600 dark:hover:bg-purple-950/40 dark:hover:text-purple-400 text-gray-400 transition-colors"
-                          onClick={() => {
-                            window.location.href = `mailto:${emp.email}`;
-                            toast(`Opening email draft to ${emp.name}`);
-                          }}
-                        >
-                          <Mail className="h-4 w-4" />
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-8 w-8 rounded-lg hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-950/40 dark:hover:text-blue-400 text-gray-400 transition-colors"
-                          onClick={() => {
-                            if (emp.phone) {
-                              window.location.href = `tel:${emp.phone}`;
-                              toast(`Dialing ${emp.phone}`);
-                            } else {
-                              toast('No phone number registered for this employee');
-                            }
-                          }}
-                        >
-                          <Phone className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </Card>
+      {/* Directory Section */}
+      <div>
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white">Team Directory</h2>
+          <span className="text-sm font-semibold text-gray-500 bg-gray-100 dark:bg-gray-900 px-3 py-1 rounded-full">{employees.length} members</span>
         </div>
 
-        {/* Right Columns Widgets */}
-        <div className="space-y-6">
-          {/* Leave Requests Widget */}
-          <Card className="border-0 shadow-sm rounded-2xl bg-white dark:bg-gray-950 p-6">
-            <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Leave Requests</h2>
-            <div className="flex flex-col items-center justify-center py-6 text-center border border-dashed border-gray-100 dark:border-gray-900 rounded-2xl">
-              <Inbox className="h-6 w-6 text-gray-400 mb-2" />
-              <h4 className="text-xs font-semibold text-gray-800 dark:text-gray-200">No pending leave requests</h4>
-              <p className="text-[10px] text-gray-500 mt-0.5">All requests have been processed.</p>
-            </div>
-          </Card>
-
-          {/* Quick HR Tools Gradient Card */}
-          <div className="bg-gradient-to-br from-indigo-500 via-purple-600 to-purple-700 text-white rounded-2xl p-6 shadow-lg relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full blur-2xl pointer-events-none" />
-            <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
-              <Briefcase className="h-5 w-5 opacity-90" />
-              Quick HR Tools
-            </h2>
-            
-            <div className="grid grid-cols-2 gap-3.5 relative z-10">
-              {[
-                { label: 'Offer Letter', icon: FileText },
-                { label: 'ID Card', icon: CreditCard },
-                { label: 'Payslip', icon: FileText },
-                { label: 'Experience...', icon: Briefcase },
-              ].map((tool, i) => (
-                <button 
-                  key={i} 
-                  onClick={() => toast(`${tool.label} generation coming soon!`)}
-                  className="flex flex-col items-center justify-center p-3.5 bg-white/10 hover:bg-white/20 border border-white/10 hover:border-white/20 rounded-2xl text-xs font-semibold tracking-wide transition-all duration-200 group active:scale-95"
-                >
-                  <tool.icon className="h-4.5 w-4.5 mb-2 opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all" />
-                  <span>{tool.label}</span>
-                </button>
-              ))}
-            </div>
+        {loading ? (
+          <div className="flex justify-center py-20 text-gray-500">Loading Directory...</div>
+        ) : employees.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center bg-white dark:bg-gray-950 rounded-2xl border border-dashed border-gray-200 dark:border-gray-800">
+            <Inbox className="h-12 w-12 text-gray-300 mb-4" />
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white">No employees found</h3>
+            <p className="text-sm text-gray-500 mt-1">Start building your amazing team today.</p>
+            <Button onClick={() => setDialogOpen(true)} className="mt-4 bg-purple-600 hover:bg-purple-700 text-white rounded-xl px-6">
+              Add First Employee
+            </Button>
           </div>
-        </div>
+        ) : (
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {employees.map((emp) => {
+              const initials = emp.name ? emp.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : 'EM';
+              const isLeave = emp.status === 'on_leave';
+              const colorClass = getInitialsColor(emp.name);
+              
+              return (
+                <div 
+                  key={emp.id} 
+                  className="group relative bg-white dark:bg-gray-950 border border-gray-100 dark:border-gray-900 rounded-3xl p-6 hover:shadow-xl hover:shadow-purple-500/5 hover:-translate-y-1 transition-all duration-300 overflow-hidden"
+                >
+                  {/* Subtle glass gradient on hover */}
+                  <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-indigo-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  
+                  <div className="relative z-10 flex flex-col items-center text-center">
+                    <div className="relative mb-4">
+                      <Avatar className="h-20 w-20 ring-4 ring-white dark:ring-gray-950 shadow-lg">
+                        <AvatarFallback className={cn("text-2xl font-black", colorClass)}>
+                          {initials}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className={cn(
+                        "absolute bottom-0 right-0 h-5 w-5 rounded-full border-4 border-white dark:border-gray-950",
+                        isLeave ? "bg-orange-500" : "bg-emerald-500"
+                      )} title={isLeave ? 'On Leave' : 'Active'} />
+                    </div>
+                    
+                    <h3 className="font-bold text-gray-900 dark:text-white text-lg tracking-tight truncate w-full">{emp.name}</h3>
+                    <p className="text-sm font-semibold text-purple-600 dark:text-purple-400 mt-0.5">{emp.role || 'Employee'}</p>
+                    <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mt-1 uppercase tracking-wider">{emp.department || 'General'}</p>
+                    
+                    <div className="w-full h-px bg-gradient-to-r from-transparent via-gray-200 dark:via-gray-800 to-transparent my-4 opacity-50 group-hover:opacity-100 transition-opacity" />
+                    
+                    <div className="flex items-center justify-center gap-3 w-full">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        className="flex-1 rounded-xl h-9 border-gray-200 dark:border-gray-800 hover:border-purple-200 hover:bg-purple-50 hover:text-purple-600 dark:hover:border-purple-900/50 dark:hover:bg-purple-950/30 dark:hover:text-purple-400 transition-colors shadow-sm"
+                        onClick={() => {
+                          window.location.href = `mailto:${emp.email}`;
+                          toast(`Opening email draft to ${emp.name}`);
+                        }}
+                      >
+                        <Mail className="h-4 w-4 mr-2" /> Email
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        className="flex-1 rounded-xl h-9 border-gray-200 dark:border-gray-800 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600 dark:hover:border-blue-900/50 dark:hover:bg-blue-950/30 dark:hover:text-blue-400 transition-colors shadow-sm"
+                        onClick={() => {
+                          if (emp.phone) {
+                            window.location.href = `tel:${emp.phone}`;
+                            toast(`Dialing ${emp.phone}`);
+                          } else {
+                            toast('No phone number registered');
+                          }
+                        }}
+                      >
+                        <Phone className="h-4 w-4 mr-2" /> Call
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* New Employee Dialog */}

@@ -170,7 +170,7 @@ function App() {
               </RoleProtectedRoute>
             } />
             <Route path="documents" element={
-              <RoleProtectedRoute roles={['super_admin', 'admin', 'hr']}>
+              <RoleProtectedRoute roles={['super_admin', 'admin', 'hr', 'employee']}>
                 <Documents />
               </RoleProtectedRoute>
             } />

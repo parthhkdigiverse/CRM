@@ -67,6 +67,7 @@ async def list_companies(
         d = item.model_dump()
         d["id"] = str(d.pop("_id", item.id))
         if d.get("assigned_to"): d["assigned_to"] = str(d["assigned_to"])
+        if d.get("linked_lead_id"): d["linked_lead_id"] = str(d["linked_lead_id"])
         data.append(d)
         
     response_data = build_paginated_response(data, total, page, per_page)
@@ -87,6 +88,7 @@ async def get_company(
     d = company.model_dump()
     d["id"] = str(d.pop("_id", company.id))
     if d.get("assigned_to"): d["assigned_to"] = str(d["assigned_to"])
+    if d.get("linked_lead_id"): d["linked_lead_id"] = str(d["linked_lead_id"])
         
     return SuccessResponse(data=d)
 

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Trash2 } from 'lucide-react';
 import { apiClient } from '@/lib/axios';
 import { toast } from 'sonner';
-import FormDrawer, { FormField, ChipSelect, inputClass, textareaClass } from '@/components/FormDrawer';
+import FormDrawer, { FormField, ChipSelect, inputClass, selectClass, textareaClass } from '@/components/FormDrawer';
 import MoreDetails from '@/components/MoreDetails';
 
 interface EditLeadDialogProps {
@@ -33,20 +33,18 @@ const sources = [
 
 const statuses = [
   { value: 'new', label: 'New' },
-  { value: 'contacted', label: 'Contacted' },
   { value: 'qualified', label: 'Qualified' },
-  { value: 'won', label: 'Won' },
-  { value: 'lost', label: 'Lost' },
-  { value: 'unqualified', label: 'Unqualified' },
+  { value: 'in_process', label: 'In Process' },
   { value: 'converted', label: 'Converted' },
 ];
 
 export default function EditLeadDialog({ open, onOpenChange, lead, onLeadUpdated }: EditLeadDialogProps) {
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
-    name: '', phone: '', source: 'web', status: 'new', assigned_to: '',
-    follow_up_date: '', notes: '', email: '', company: '', value: '', job_title: '', address: '',
+    name: '', phone: '', source: 'web', status: 'new',
+    email: '', company: '', value: '', job_title: '', address: '',
   });
+  const [employees, setEmployees] = useState<any[]>([]);
 
   useEffect(() => {
     if (lead && open) {
@@ -55,15 +53,18 @@ export default function EditLeadDialog({ open, onOpenChange, lead, onLeadUpdated
         phone: lead.phone || '',
         source: lead.source || 'web',
         status: lead.status || 'new',
-        assigned_to: lead.assigned_to || '',
-        follow_up_date: lead.follow_up_date ? lead.follow_up_date.split('T')[0] : '',
-        notes: lead.notes || '',
         email: lead.email || '',
         company: lead.company || '',
         value: lead.value?.toString() || '',
         job_title: lead.job_title || '',
         address: lead.address || '',
       });
+    }
+
+    if (open) {
+      apiClient.get('/employees?per_page=100').then((res) => {
+        setEmployees(res.data.data || []);
+      }).catch(console.error);
     }
   }, [lead, open]);
 
@@ -78,7 +79,7 @@ export default function EditLeadDialog({ open, onOpenChange, lead, onLeadUpdated
 
   const visibleStatuses = statuses.filter(s => {
     if (s.value === form.status) return true;
-    return ['new', 'contacted', 'qualified', 'converted', 'unqualified'].includes(s.value);
+    return ['new', 'qualified', 'in_process', 'converted'].includes(s.value);
   });
 
   const handleSave = async () => {
@@ -95,10 +96,7 @@ export default function EditLeadDialog({ open, onOpenChange, lead, onLeadUpdated
       if (form.email.trim()) payload.email = form.email.trim();
       if (form.company.trim()) payload.company = form.company.trim();
       if (form.job_title.trim()) payload.job_title = form.job_title.trim();
-      if (form.assigned_to.trim()) payload.assigned_to = form.assigned_to.trim();
       payload.value = parseFloat(form.value) || 0;
-      if (form.notes.trim()) payload.notes = form.notes.trim();
-      if (form.follow_up_date) payload.follow_up_date = form.follow_up_date;
 
       await apiClient.put(`/leads/${lead.id}`, payload);
       toast.success('Lead updated successfully');
@@ -137,49 +135,33 @@ export default function EditLeadDialog({ open, onOpenChange, lead, onLeadUpdated
     >
       {/* Visible Fields */}
       <FormField label="Lead Name" required>
-        <Input value={form.name} onChange={(e) => u('name', e.target.value)} placeholder="e.g. Anita Patel" className={inputClass} autoFocus />
+        <Input id="edit-lead-name" name="lead_name" value={form.name} onChange={(e) => u('name', e.target.value)} placeholder="e.g. Anita Patel" className={inputClass} autoFocus />
       </FormField>
 
       <FormField label="Phone" required>
-        <Input value={form.phone} onChange={(e) => u('phone', e.target.value)} placeholder="+91 98765 43210" className={inputClass} />
+        <Input id="edit-lead-phone" name="lead_phone" value={form.phone} onChange={(e) => u('phone', e.target.value)} placeholder="+91 98765 43210" className={inputClass} />
       </FormField>
 
       <FormField label="Source">
         <ChipSelect options={visibleSources} value={form.source} onChange={(v) => u('source', v)} />
       </FormField>
 
-      <FormField label="Status">
-        <ChipSelect options={visibleStatuses} value={form.status} onChange={(v) => u('status', v)} />
-      </FormField>
-
-      <FormField label="Assigned To">
-        <Input value={form.assigned_to} onChange={(e) => u('assigned_to', e.target.value)} placeholder="Team member name" className={inputClass} />
-      </FormField>
-
-      <FormField label="Next Follow-up">
-        <Input type="date" value={form.follow_up_date} onChange={(e) => u('follow_up_date', e.target.value)} className={inputClass} />
-      </FormField>
-
-      <FormField label="Notes">
-        <textarea value={form.notes} onChange={(e) => u('notes', e.target.value)} placeholder="Any notes..." rows={2} className={textareaClass} />
-      </FormField>
-
       {/* More Details */}
       <MoreDetails>
         <FormField label="Email">
-          <Input type="email" value={form.email} onChange={(e) => u('email', e.target.value)} placeholder="anita@company.com" className={inputClass} />
+          <Input id="edit-lead-email" name="lead_email" type="email" value={form.email} onChange={(e) => u('email', e.target.value)} placeholder="anita@company.com" className={inputClass} />
         </FormField>
         <FormField label="Company">
-          <Input value={form.company} onChange={(e) => u('company', e.target.value)} placeholder="e.g. Tata Motors" className={inputClass} />
+          <Input id="edit-lead-company" name="lead_company" value={form.company} onChange={(e) => u('company', e.target.value)} placeholder="e.g. Tata Motors" className={inputClass} />
         </FormField>
         <FormField label="Budget (₹)">
-          <Input type="number" value={form.value} onChange={(e) => u('value', e.target.value)} placeholder="250000" className={inputClass} />
+          <Input id="edit-lead-value" name="lead_value" type="number" value={form.value} onChange={(e) => u('value', e.target.value)} placeholder="250000" className={inputClass} />
         </FormField>
         <FormField label="Designation">
-          <Input value={form.job_title} onChange={(e) => u('job_title', e.target.value)} placeholder="e.g. Sales Director" className={inputClass} />
+          <Input id="edit-lead-job-title" name="lead_job_title" value={form.job_title} onChange={(e) => u('job_title', e.target.value)} placeholder="e.g. Sales Director" className={inputClass} />
         </FormField>
         <FormField label="Address">
-          <textarea value={form.address} onChange={(e) => u('address', e.target.value)} placeholder="Full address..." rows={2} className={textareaClass} />
+          <textarea id="edit-lead-address" name="lead_address" value={form.address} onChange={(e) => u('address', e.target.value)} placeholder="Full address..." rows={2} className={textareaClass} />
         </FormField>
       </MoreDetails>
 

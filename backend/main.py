@@ -82,6 +82,8 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
             details=errors
         )
     )
+    with open("error.log", "a") as f:
+        f.write(f"VALIDATION ERROR: {errors}\n")
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content=error_response.model_dump()
@@ -99,6 +101,8 @@ async def global_exception_handler(request: Request, exc: Exception):
             message="An unexpected error occurred. Please try again later."
         )
     )
+    with open("error.log", "a") as f:
+        f.write(f"500 ERROR: {exc}\n")
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content=error_response.model_dump()

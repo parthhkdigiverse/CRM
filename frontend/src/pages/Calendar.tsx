@@ -1,10 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { 
-  Plus, Calendar as CalendarIcon, Clock, MapPin, Video, X, Loader2, Trash2
+  Plus, Clock, MapPin, Video, X, Loader2, Trash2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';

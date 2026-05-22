@@ -24,6 +24,9 @@ class Employee(Document):
     status: str = "active"  # active, inactive
     reporting_to: Optional[PydanticObjectId] = None
     avatar_url: Optional[str] = None
+    address: Optional[str] = None
+    skills: Optional[str] = None
+    notes: Optional[str] = None
 
     # Base fields
     org_id: PydanticObjectId

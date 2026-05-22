@@ -25,6 +25,7 @@ class Contact(Document):
     tags: List[str] = Field(default_factory=list)
     notes: Optional[str] = None
     custom_fields: Dict = Field(default_factory=dict)
+    linked_lead_id: Optional[PydanticObjectId] = None
 
     # Base fields
     org_id: PydanticObjectId

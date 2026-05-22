@@ -18,7 +18,7 @@ class Lead(Document):
     phone: Optional[str] = None
     company: Optional[str] = None
     source: str = "web"  # web, referral, social, cold, event
-    status: str = "new"  # new, contacted, qualified, unqualified, converted
+    status: str = "new"  # new, qualified, in_process, converted
     score: int = 0  # 1-100
     value: float = 0.0  # Estimated deal size/budget
     job_title: Optional[str] = None  # Contact's job title/designation

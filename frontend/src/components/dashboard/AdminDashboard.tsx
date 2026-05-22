@@ -271,7 +271,7 @@ export default function AdminDashboard() {
       {/* Charts Row */}
       <div className="grid gap-6 md:grid-cols-3">
         {/* Area Chart */}
-        <Card className="md:col-span-2 border-0 shadow-sm rounded-2xl bg-white dark:bg-gray-950">
+        <Card className="md:col-span-2 min-w-0 border-0 shadow-sm rounded-2xl bg-white dark:bg-gray-950">
           <CardHeader className="p-6 pb-2 flex flex-row items-center justify-between">
             <div>
               <CardTitle className="text-lg font-bold">Revenue vs Receivables Ratio</CardTitle>
@@ -282,46 +282,48 @@ export default function AdminDashboard() {
                <div className="flex items-center gap-1.5"><div className="h-2 w-2 rounded-full bg-orange-500"></div>Receivables</div>
             </div>
           </CardHeader>
-          <CardContent className="p-6 pt-4 min-h-[300px]">
-            <ResponsiveContainer width="100%" minHeight={250}>
-              <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2}/>
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                  </linearGradient>
-                  <linearGradient id="colorExpense" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#f97316" stopOpacity={0.2}/>
-                    <stop offset="95%" stopColor="#f97316" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" className="dark:stroke-gray-800" />
-                <XAxis dataKey="name" stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'rgba(255, 255, 255, 0.8)', 
-                    border: 'none', 
-                    borderRadius: '8px',
-                    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
-                  }} 
-                />
-                <Area type="monotone" dataKey="Revenue" stroke="#3b82f6" strokeWidth={2} fillOpacity={1} fill="url(#colorRevenue)" />
-                <Area type="monotone" dataKey="Expense" stroke="#f97316" strokeWidth={2} fillOpacity={1} fill="url(#colorExpense)" />
-              </AreaChart>
-            </ResponsiveContainer>
+          <CardContent className="p-6 pt-4">
+            <div className="h-[250px] w-full min-w-0">
+              <ResponsiveContainer width="100%" height={250} minWidth={0} minHeight={250}>
+                <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2}/>
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                    </linearGradient>
+                    <linearGradient id="colorExpense" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#f97316" stopOpacity={0.2}/>
+                      <stop offset="95%" stopColor="#f97316" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" className="dark:stroke-gray-800" />
+                  <XAxis dataKey="name" stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} />
+                  <YAxis stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                      border: 'none',
+                      borderRadius: '8px',
+                      boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
+                    }}
+                  />
+                  <Area type="monotone" dataKey="Revenue" stroke="#3b82f6" strokeWidth={2} fillOpacity={1} fill="url(#colorRevenue)" />
+                  <Area type="monotone" dataKey="Expense" stroke="#f97316" strokeWidth={2} fillOpacity={1} fill="url(#colorExpense)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
           </CardContent>
         </Card>
 
         {/* Donut Chart */}
-        <Card className="md:col-span-1 border-0 shadow-sm rounded-2xl bg-white dark:bg-gray-950">
+        <Card className="md:col-span-1 min-w-0 border-0 shadow-sm rounded-2xl bg-white dark:bg-gray-950">
           <CardHeader className="p-6 pb-2">
             <CardTitle className="text-lg font-bold">Department Performance</CardTitle>
             <p className="text-xs text-gray-500 mt-1">Contribution share</p>
           </CardHeader>
-          <CardContent className="p-6 pt-0 min-h-[300px] flex flex-col justify-center">
-            <div className="w-full min-h-[200px]">
-              <ResponsiveContainer width="100%" minHeight={200}>
+          <CardContent className="p-6 pt-0 flex flex-col justify-center">
+            <div className="h-[200px] w-full min-w-0">
+              <ResponsiveContainer width="100%" height={200} minWidth={0} minHeight={200}>
                 <PieChart>
                   <Pie
                     data={pieData}

@@ -2,7 +2,7 @@
 Super Admin routes — platform-wide management.
 """
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from beanie import PydanticObjectId
 
@@ -225,9 +225,9 @@ async def change_user_role(
 
 class SuperAdminCreate(BaseModel):
     email: EmailStr
-    first_name: str
-    last_name: str
-    password: str
+    first_name: str = Field(..., min_length=1)
+    last_name: str = ""
+    password: str = Field(..., min_length=8)
 
 @router.get("/super-admins", response_model=SuccessResponse, dependencies=[Depends(require_roles("super_admin"))])
 async def list_super_admins():
@@ -247,6 +247,9 @@ async def create_super_admin(
     current_user: User = Depends(get_current_user)
 ):
     """Create a new super admin."""
+    if not data.password.strip():
+        raise HTTPException(status_code=400, detail="Password is required.")
+
     existing_user = await User.find_one(User.email == data.email.lower())
     if existing_user:
         raise HTTPException(status_code=400, detail="A user with this email address already exists.")

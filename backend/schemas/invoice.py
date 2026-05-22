@@ -18,6 +18,7 @@ class LineItemSchema(BaseModel):
 class InvoiceCreate(BaseModel):
     contact_id: Optional[str] = None
     company_id: Optional[str] = None
+    customer_name: Optional[str] = None
     line_items: List[LineItemSchema] = []
     discount: float = 0.0
     currency: str = "INR"
@@ -30,6 +31,7 @@ class InvoiceCreate(BaseModel):
 class InvoiceUpdate(BaseModel):
     contact_id: Optional[str] = None
     company_id: Optional[str] = None
+    customer_name: Optional[str] = None
     line_items: Optional[List[LineItemSchema]] = None
     discount: Optional[float] = None
     currency: Optional[str] = None
@@ -49,6 +51,7 @@ class InvoiceResponse(BaseModel):
     invoice_number: str
     contact_id: Optional[str] = None
     company_id: Optional[str] = None
+    customer_name: Optional[str] = None
     line_items: List[dict] = []
     subtotal: float
     tax_amount: float

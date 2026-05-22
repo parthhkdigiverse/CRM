@@ -43,7 +43,8 @@ async def create_project(
         progress=data.progress,
         budget=data.budget,
         end_date=data.end_date,
-        assignee_ids=assignees
+        assignee_ids=assignees,
+        linked_lead_id=PydanticObjectId(data.linked_lead_id) if data.linked_lead_id else None
     )
     await project.insert()
     await log_action(str(org.id) if org else "super_admin", str(current_user.id), "create", "projects", str(project.id))
@@ -64,6 +65,15 @@ async def list_projects(
     if status:
         query["status"] = status
 
+    from middleware.rbac import get_permission
+    perm = get_permission(current_user.role, "projects")
+    if perm == "own":
+        from models.employee import Employee
+        employee = await Employee.find_one(Employee.user_id == current_user.id, Employee.is_deleted == False)
+        if not employee:
+            return SuccessResponse(data=[])
+        query["assignee_ids"] = employee.id
+
     items = await Project.find(query).to_list()
     
     # Format return list
@@ -74,6 +84,7 @@ async def list_projects(
         d["org_id"] = str(d["org_id"])
         d["created_by"] = str(d["created_by"])
         d["assignee_ids"] = [str(aid) for aid in d.get("assignee_ids", [])]
+        if d.get("linked_lead_id"): d["linked_lead_id"] = str(d["linked_lead_id"])
         data.append(d)
 
     return SuccessResponse(data=data)
@@ -94,6 +105,7 @@ async def get_project(
     d["org_id"] = str(d["org_id"])
     d["created_by"] = str(d["created_by"])
     d["assignee_ids"] = [str(aid) for aid in d.get("assignee_ids", [])]
+    if d.get("linked_lead_id"): d["linked_lead_id"] = str(d["linked_lead_id"])
 
     return SuccessResponse(data=d)
 
@@ -126,6 +138,8 @@ async def update_project(
     else:
         if "assignee_ids" in update_data:
             update_data["assignee_ids"] = [PydanticObjectId(aid) for aid in update_data["assignee_ids"] if aid]
+        if "linked_lead_id" in update_data:
+            update_data["linked_lead_id"] = PydanticObjectId(update_data["linked_lead_id"]) if update_data["linked_lead_id"] else None
 
     for k, v in update_data.items():
         setattr(project, k, v)
@@ -133,6 +147,23 @@ async def update_project(
     project.updated_by = current_user.id
     project.updated_at = utc_now()
     await project.save()
+
+    # Sync lead status if linked
+    if project.linked_lead_id and "status" in update_data:
+        from models.lead import Lead
+        linked_lead = await Lead.find_one({"_id": project.linked_lead_id})
+        if linked_lead:
+            new_lead_status = None
+            if project.status == "completed":
+                new_lead_status = "converted"
+            elif project.status in ["planning", "in_process", "testing"] and linked_lead.status != "converted":
+                new_lead_status = "in_process"
+
+            if new_lead_status and linked_lead.status != new_lead_status:
+                linked_lead.status = new_lead_status
+                linked_lead.updated_at = utc_now()
+                linked_lead.updated_by = current_user.id
+                await linked_lead.save()
 
     # Format assignees for readability in changes log
     changes_logged = update_data.copy()

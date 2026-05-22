@@ -17,8 +17,11 @@ import { cn } from '@/lib/utils';
 import { formatINRCompact } from '@/lib/currency';
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/axios';
+import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import NewLeadDialog from '@/components/NewLeadDialog';
 import EditLeadDialog from '@/components/EditLeadDialog';
+import ConvertLeadDialog from '@/components/ConvertLeadDialog';
+import EditCompanyDialog from '@/components/EditCompanyDialog';
 
 interface Deal {
   id: string;
@@ -104,6 +107,10 @@ export default function Deals() {
   console.log(loading); // Fix TS unused
   const [selectedLead, setSelectedLead] = useState<any | null>(null);
   const [leadEditDialogOpen, setLeadEditDialogOpen] = useState(false);
+  const [convertingLead, setConvertingLead] = useState<any | null>(null);
+  const [convertDialogOpen, setConvertDialogOpen] = useState(false);
+  const [selectedClient, setSelectedClient] = useState<any | null>(null);
+  const [clientEditDialogOpen, setClientEditDialogOpen] = useState(false);
 
   const fetchCRMData = useCallback(async () => {
     setLoading(true);
@@ -125,6 +132,7 @@ export default function Deals() {
           let dealStage = 'prospecting';
           if (l.status === 'contacted') dealStage = 'qualification';
           if (l.status === 'qualified') dealStage = 'proposal';
+          if (l.status === 'in_process') dealStage = 'negotiation';
           if (l.status === 'unqualified') dealStage = 'closed_lost';
 
           return {
@@ -160,6 +168,74 @@ export default function Deals() {
     fetchCRMData();
   }, [fetchCRMData]);
 
+  const handleDragEnd = async (result: DropResult) => {
+    const { source, destination, draggableId } = result;
+    if (!destination) return;
+    if (source.droppableId === destination.droppableId) return;
+
+    const newStage = destination.droppableId;
+    const isLead = draggableId.startsWith('lead-');
+    const realId = isLead ? draggableId.replace('lead-', '') : draggableId;
+
+    // Optimistically update UI
+    setDeals(prev => {
+      const copy = [...prev];
+      const itemIndex = copy.findIndex(d => d.id === draggableId);
+      if (itemIndex > -1) {
+        copy[itemIndex] = { ...copy[itemIndex], stage: newStage };
+      }
+      return copy;
+    });
+
+    if (isLead) {
+      if (newStage === 'closed_won') {
+        // Trigger conversion dialog, revert optimistic update for now until confirmed
+        const draggedLead = deals.find(d => d.id === draggableId);
+        setDeals(prev => {
+          const copy = [...prev];
+          const itemIndex = copy.findIndex(d => d.id === draggableId);
+          if (itemIndex > -1) {
+            copy[itemIndex] = { ...copy[itemIndex], stage: source.droppableId }; // revert
+          }
+          return copy;
+        });
+        setConvertingLead({
+          id: realId,
+          name: draggedLead?.title,
+          sourceCol: source.droppableId,
+        });
+        setConvertDialogOpen(true);
+        return;
+      }
+
+      // Map deal stage to lead status
+      let newStatus = 'new';
+      if (newStage === 'qualification') newStatus = 'contacted';
+      if (newStage === 'proposal') newStatus = 'qualified';
+      if (newStage === 'negotiation') newStatus = 'in_process';
+      if (newStage === 'closed_lost') newStatus = 'unqualified';
+
+      try {
+        await apiClient.put(`/leads/${realId}`, { status: newStatus });
+        toast.success(`Lead moved to ${newStage.replace('_', ' ')}`);
+        fetchCRMData();
+      } catch (err) {
+        toast.error('Failed to update lead status');
+        fetchCRMData(); // Revert
+      }
+    } else {
+      // It's a Deal
+      try {
+        await apiClient.put(`/deals/${realId}`, { stage: newStage });
+        toast.success(`Deal moved to ${newStage.replace('_', ' ')}`);
+        fetchCRMData();
+      } catch (err) {
+        toast.error('Failed to update deal stage');
+        fetchCRMData(); // Revert
+      }
+    }
+  };
+
   const pipelineData: Record<string, Deal[]> = stageConfig.reduce((acc, stage) => {
     acc[stage.id] = deals.filter(d => d.stage === stage.id);
     return acc;
@@ -178,15 +254,13 @@ export default function Deals() {
     ? Math.round(dealsWithValue.reduce((sum, d) => sum + (d.value || 0), 0) / dealsWithValue.length) 
     : 0;
 
-  // Map and filter clients list dynamically
   const clients = companies.map(comp => {
-    const associatedContact = contacts.find(c => c.company_id === comp.id);
     return {
       id: comp.id,
       company_name: comp.name,
       company_email: comp.email || 'N/A',
-      contact_name: associatedContact ? `${associatedContact.first_name} ${associatedContact.last_name}` : 'No Contact Assigned',
-      contact_phone: associatedContact?.phone || comp.phone || 'N/A',
+      contact_name: comp.contact_name || 'No Contact Assigned',
+      contact_phone: comp.phone || 'N/A',
       value: comp.annual_revenue || 0,
       status: (comp.annual_revenue && comp.annual_revenue > 1000000 ? 'VIP' : 'Active') as 'VIP' | 'Active' | 'Pending'
     };
@@ -288,16 +362,23 @@ export default function Deals() {
       </div>
 
       {/* Kanban Board */}
-      <div className="bg-white dark:bg-gray-950 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 flex flex-col overflow-hidden">
-         <div className="p-5 border-b border-gray-100 dark:border-gray-800 shrink-0">
-            <h3 className="font-bold text-gray-900 dark:text-white">Sales Pipeline</h3>
-         </div>
-         
-         <div className="overflow-x-auto p-5 flex gap-4 scrollbar-thin">
-            {stageConfig.map((stage) => {
-              const stageLeads = pipelineData[stage.id] || [];
-              return (
-                <div key={stage.id} className="w-[260px] shrink-0 flex flex-col bg-gray-50/50 dark:bg-gray-900/50 rounded-2xl p-3 border border-gray-100 dark:border-gray-800/50">
+      <DragDropContext onDragEnd={handleDragEnd}>
+        <div className="bg-white dark:bg-gray-950 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 flex flex-col overflow-hidden">
+           <div className="p-5 border-b border-gray-100 dark:border-gray-800 shrink-0">
+              <h3 className="font-bold text-gray-900 dark:text-white">Sales Pipeline</h3>
+           </div>
+           
+           <div className="overflow-x-auto p-5 flex gap-4 scrollbar-thin">
+              {stageConfig.map((stage) => {
+                const stageLeads = pipelineData[stage.id] || [];
+                return (
+                  <Droppable key={stage.id} droppableId={stage.id}>
+                    {(provided) => (
+                      <div 
+                        ref={provided.innerRef}
+                        {...provided.droppableProps}
+                        className="w-[260px] shrink-0 flex flex-col bg-gray-50/50 dark:bg-gray-900/50 rounded-2xl p-3 border border-gray-100 dark:border-gray-800/50"
+                      >
                   {/* Column Header */}
                   <div className="flex items-center justify-between mb-4 px-1">
                     <div className="flex items-center gap-2">
@@ -310,15 +391,19 @@ export default function Deals() {
                   </div>
 
                   {/* Cards */}
-                  <div className="space-y-3 overflow-y-auto max-h-[420px] pr-0.5 scrollbar-thin">
-                    {stageLeads.map((deal) => (
-                      <div 
-                        key={deal.id}
-                        className="bg-white dark:bg-gray-950 border border-gray-150 dark:border-gray-850 rounded-xl p-4 shadow-sm hover:shadow-md transition-all cursor-grab relative overflow-hidden group"
-                        onClick={() => {
-                          if (deal.isLead) {
-                            const realLeadId = deal.id.replace('lead-', '');
-                            setSelectedLead({
+                  <div className="space-y-3 overflow-y-auto max-h-[420px] pr-0.5 scrollbar-thin min-h-[150px]">
+                    {stageLeads.map((deal, index) => (
+                      <Draggable key={deal.id} draggableId={deal.id} index={index}>
+                        {(provided) => (
+                          <div 
+                            ref={provided.innerRef}
+                            {...provided.draggableProps}
+                            {...provided.dragHandleProps}
+                            className="bg-white dark:bg-gray-950 border border-gray-150 dark:border-gray-850 rounded-xl p-4 shadow-sm hover:shadow-md transition-all relative overflow-hidden group"
+                            onClick={() => {
+                              if (deal.isLead) {
+                                const realLeadId = deal.id.replace('lead-', '');
+                                setSelectedLead({
                               id: realLeadId,
                               name: deal.title,
                               email: deal.contact_email,
@@ -365,18 +450,24 @@ export default function Deals() {
                           </div>
                         </div>
                       </div>
-                    ))}
+                    )}
+                  </Draggable>
+                ))}
+                    {provided.placeholder}
                     {stageLeads.length === 0 && (
-                      <div className="text-center py-8 text-xs text-gray-400 border-2 border-dashed border-gray-100 dark:border-gray-900 rounded-xl">
+                      <div className="text-center py-8 text-xs text-gray-400 border-2 border-dashed border-gray-100 dark:border-gray-900 rounded-xl pointer-events-none">
                         No leads here
                       </div>
                     )}
                   </div>
                 </div>
-              );
-            })}
+              )}
+            </Droppable>
+          );
+        })}
          </div>
       </div>
+      </DragDropContext>
 
       {/* All Clients Section */}
       <div className="bg-white dark:bg-gray-950 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden">
@@ -406,7 +497,14 @@ export default function Deals() {
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-850">
               {filteredClients.map((client) => (
-                <tr key={client.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-900/50 transition-colors">
+                <tr 
+                  key={client.id} 
+                  className="border-b border-gray-50 dark:border-gray-800/50 hover:bg-gray-50/50 dark:hover:bg-gray-900/50 transition-colors cursor-pointer"
+                  onClick={() => {
+                    setSelectedClient(client);
+                    setClientEditDialogOpen(true);
+                  }}
+                >
                   <td className="px-6 py-4 flex items-center gap-3">
                     <div className={cn("h-8 w-8 rounded-full flex items-center justify-center font-bold text-xs shrink-0", getAvatarColor(client.company_name))}>
                       {client.company_name.charAt(0)}
@@ -468,6 +566,29 @@ export default function Deals() {
         onOpenChange={setLeadEditDialogOpen}
         lead={selectedLead}
         onLeadUpdated={fetchCRMData}
+      />
+
+      {/* Convert Lead Dialog */}
+      <ConvertLeadDialog
+        open={convertDialogOpen}
+        onOpenChange={setConvertDialogOpen}
+        lead={convertingLead}
+        onLeadConverted={() => {
+          setConvertingLead(null);
+          fetchCRMData();
+        }}
+        onCancel={() => {
+          setConvertingLead(null);
+          fetchCRMData(); // Will revert the optimistic update by fetching true state
+        }}
+      />
+
+      {/* Edit Client Dialog */}
+      <EditCompanyDialog
+        open={clientEditDialogOpen}
+        onOpenChange={setClientEditDialogOpen}
+        company={selectedClient}
+        onUpdated={fetchCRMData}
       />
     </div>
   );

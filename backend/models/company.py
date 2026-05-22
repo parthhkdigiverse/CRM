@@ -22,8 +22,10 @@ class Company(Document):
     address: Optional[Dict] = None  # {street, city, state, country, zip}
     annual_revenue: Optional[float] = None
     assigned_to: Optional[PydanticObjectId] = None
+    contact_name: Optional[str] = None
     tags: List[str] = Field(default_factory=list)
     notes: Optional[str] = None
+    linked_lead_id: Optional[PydanticObjectId] = None
 
     # Base fields
     org_id: PydanticObjectId

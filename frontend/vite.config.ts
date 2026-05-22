@@ -11,7 +11,20 @@ export default defineConfig(({ mode }) => {
   
   return {
     plugins: [react(), tailwindcss()],
-    server: { port },
+    server: { 
+      port,
+      allowedHosts: true,
+      proxy: {
+        '/api': {
+          target: `http://127.0.0.1:${backendPort}`,
+          changeOrigin: true
+        },
+        '/storage': {
+          target: `http://127.0.0.1:${backendPort}`,
+          changeOrigin: true
+        }
+      }
+    },
     define: {
       'import.meta.env.VITE_BACKEND_PORT': JSON.stringify(backendPort)
     },

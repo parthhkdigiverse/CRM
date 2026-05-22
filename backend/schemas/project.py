@@ -16,6 +16,7 @@ class ProjectCreate(BaseModel):
     budget: float = 0.0
     end_date: Optional[datetime] = None
     assignee_ids: List[str] = []
+    linked_lead_id: Optional[str] = None
 
 
 class ProjectUpdate(BaseModel):
@@ -27,6 +28,7 @@ class ProjectUpdate(BaseModel):
     budget: Optional[float] = None
     end_date: Optional[datetime] = None
     assignee_ids: Optional[List[str]] = None
+    linked_lead_id: Optional[str] = None
 
 
 class ProjectResponse(BaseModel):
@@ -39,6 +41,7 @@ class ProjectResponse(BaseModel):
     budget: float
     end_date: Optional[datetime] = None
     assignee_ids: List[str] = []
+    linked_lead_id: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     org_id: str

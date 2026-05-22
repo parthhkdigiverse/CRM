@@ -24,6 +24,25 @@ def main():
         shell=True
     )
     
+    # Start ngrok tunnel
+    try:
+        from pyngrok import ngrok
+        print("Starting ngrok tunnel...")
+        
+        # Check for authtoken in environment
+        authtoken = os.getenv("NGROK_AUTHTOKEN")
+        if authtoken:
+            ngrok.set_auth_token(authtoken)
+            
+        tunnel = ngrok.connect(frontend_port, "http")
+        print("="*50)
+        print(f"🌟 CRM is live on the internet at: {tunnel.public_url}")
+        print("="*50)
+    except ImportError:
+        print("pyngrok not installed. Run 'pip install pyngrok' to expose the CRM to the internet.")
+    except Exception as e:
+        print(f"Failed to start ngrok: {e}")
+    
     try:
         backend_process.wait()
         frontend_process.wait()

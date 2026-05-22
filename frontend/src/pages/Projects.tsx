@@ -27,8 +27,8 @@ import FormDrawer, { FormField, ChipSelect, inputClass, selectClass, textareaCla
 import MoreDetails from '@/components/MoreDetails';
 
 const statusConfigs: Record<string, { label: string, color: string }> = {
-  active: { 
-    label: 'Active', 
+  in_process: { 
+    label: 'In Process', 
     color: 'bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/50' 
   },
   completed: { 
@@ -39,8 +39,8 @@ const statusConfigs: Record<string, { label: string, color: string }> = {
     label: 'Planning', 
     color: 'bg-sky-50 text-sky-600 border-sky-100 dark:bg-sky-950/40 dark:text-sky-400 dark:border-sky-900/50' 
   },
-  on_hold: { 
-    label: 'On Hold', 
+  testing: { 
+    label: 'Testing', 
     color: 'bg-amber-50 text-amber-600 border-amber-100 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-900/50' 
   },
 };
@@ -66,20 +66,41 @@ export default function Projects() {
   const [budget, setBudget] = useState(0);
   const [endDate, setEndDate] = useState('');
   const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
+  const [linkedLeadId, setLinkedLeadId] = useState('');
+  const [leads, setLeads] = useState<any[]>([]);
 
   const [submitLoading, setSubmitLoading] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const [projectsRes, empRes] = await Promise.all([
-        apiClient.get('/projects'),
-        apiClient.get('/employees?per_page=100')
-      ]);
-      setProjects(projectsRes.data.data || []);
-      setEmployees(empRes.data.data || []);
+      
+      // Fetch projects (required)
+      try {
+        const projectsRes = await apiClient.get('/projects');
+        setProjects(projectsRes.data.data || []);
+      } catch (e) {
+        console.error('Failed to load projects:', e);
+      }
+      
+      // Fetch employees (might fail for employees due to RBAC)
+      try {
+        const empRes = await apiClient.get('/employees?per_page=100');
+        setEmployees(empRes.data.data || []);
+      } catch (e) {
+        console.warn('Failed to load employees:', e);
+      }
+      
+      // Fetch leads (might fail for employees due to RBAC)
+      try {
+        const leadsRes = await apiClient.get('/leads?per_page=100');
+        setLeads(leadsRes.data.data || []);
+      } catch (e) {
+        console.warn('Failed to load leads:', e);
+      }
+
     } catch (error) {
-      console.warn('Failed to load projects/employees:', error);
+      console.warn('Unexpected error in fetchData:', error);
     } finally {
       setLoading(false);
     }
@@ -101,6 +122,7 @@ export default function Projects() {
       setBudget(project.budget || 0);
       setEndDate(project.end_date ? new Date(project.end_date).toISOString().split('T')[0] : '');
       setAssigneeIds(project.assignee_ids || []);
+      setLinkedLeadId(project.linked_lead_id || '');
     } else {
       setSelectedProject(null);
       // Auto generate project code e.g. P-006
@@ -113,6 +135,7 @@ export default function Projects() {
       setBudget(0);
       setEndDate('');
       setAssigneeIds([]);
+      setLinkedLeadId('');
     }
     setDialogOpen(true);
   };
@@ -135,7 +158,8 @@ export default function Projects() {
         progress: Number(progress),
         budget: Number(budget),
         end_date: endDate ? new Date(endDate).toISOString() : null,
-        assignee_ids: assigneeIds
+        assignee_ids: assigneeIds,
+        linked_lead_id: linkedLeadId || null
       };
 
       if (selectedProject) {
@@ -190,7 +214,7 @@ export default function Projects() {
 
   // Count summaries
   const totalCount = projects.length;
-  const activeCount = projects.filter(p => p.status === 'active').length;
+  const inProcessCount = projects.filter(p => p.status === 'in_process').length;
   const completedCount = projects.filter(p => p.status === 'completed').length;
 
   return (
@@ -247,8 +271,8 @@ export default function Projects() {
             </div>
           </div>
           <CardContent className="p-5">
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Active</p>
-            <div className="text-3xl font-black mt-2 mb-1">{activeCount}</div>
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">In Process</p>
+            <div className="text-3xl font-black mt-2 mb-1">{inProcessCount}</div>
             <p className="text-xs font-medium text-blue-500">Currently in progress</p>
           </CardContent>
         </Card>
@@ -283,7 +307,7 @@ export default function Projects() {
       {/* Filter Tabs & Controls */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-gray-200/50 dark:border-gray-800/50 pb-2">
         <div className="flex gap-2">
-          {['all', 'planning', 'active', 'completed', 'on_hold'].map((tab) => (
+          {['all', 'planning', 'in_process', 'testing', 'completed'].map((tab) => (
             <button
               key={tab}
               onClick={() => setStatusFilter(tab)}
@@ -488,14 +512,22 @@ export default function Projects() {
           <ChipSelect
             options={[
               { value: 'planning', label: 'Planning' },
-              { value: 'active', label: 'In Progress' },
+              { value: 'in_process', label: 'In Process' },
               { value: 'testing', label: 'Testing' },
               { value: 'completed', label: 'Completed' },
-              { value: 'on_hold', label: 'On Hold' },
             ]}
             value={status}
             onChange={(v) => setStatus(v)}
           />
+        </FormField>
+        
+        <FormField label="Linked Lead">
+          <select value={linkedLeadId} onChange={(e) => setLinkedLeadId(e.target.value)} className={inputClass}>
+            <option value="">None</option>
+            {leads.map((l: any) => (
+              <option key={l.id} value={l.id}>{l.name} - {l.company || 'No Company'}</option>
+            ))}
+          </select>
         </FormField>
 
         {!isEmployee && (

@@ -83,7 +83,14 @@ export default function AdminPanel() {
 
   const handleCreateSA = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newSAFirstName || !newSAEmail || !newSAPassword) return;
+    if (!newSAFirstName.trim() || !newSAEmail.trim() || !newSAPassword.trim()) {
+      toast.error('First name, email, and password are required');
+      return;
+    }
+    if (newSAPassword.length < 8) {
+      toast.error('Super Admin password must be at least 8 characters');
+      return;
+    }
     try {
       setIsCreatingSA(true);
       await apiClient.post('/admin/super-admins', {
@@ -374,7 +381,7 @@ export default function AdminPanel() {
       <div className="border-0 shadow-sm rounded-2xl bg-white dark:bg-gray-950 overflow-hidden">
         <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
           <h2 className="text-lg font-semibold">Organizations</h2>
-          <Button onClick={() => setIsOrgDialogOpen(true)} className="bg-primary hover:bg-primary/90 text-white rounded-xl shadow-sm text-sm h-9 px-4">
+          <Button onClick={() => setIsOrgDialogOpen(true)} className="bg-purple-600 hover:bg-purple-700 text-white dark:bg-purple-500 dark:hover:bg-purple-600 dark:text-white rounded-xl shadow-sm text-sm h-9 px-4">
             <Plus className="h-4 w-4 mr-1.5" />
             Add Organization
           </Button>
@@ -668,21 +675,21 @@ export default function AdminPanel() {
               <form onSubmit={handleCreateSA} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>First Name</Label>
-                    <Input value={newSAFirstName} onChange={e => setNewSAFirstName(e.target.value)} required />
+                    <Label htmlFor="super-admin-first-name">First Name</Label>
+                    <Input id="super-admin-first-name" name="super_admin_first_name" value={newSAFirstName} onChange={e => setNewSAFirstName(e.target.value)} required />
                   </div>
                   <div className="space-y-2">
-                    <Label>Last Name</Label>
-                    <Input value={newSALastName} onChange={e => setNewSALastName(e.target.value)} />
+                    <Label htmlFor="super-admin-last-name">Last Name</Label>
+                    <Input id="super-admin-last-name" name="super_admin_last_name" value={newSALastName} onChange={e => setNewSALastName(e.target.value)} />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label>Email</Label>
-                  <Input type="email" value={newSAEmail} onChange={e => setNewSAEmail(e.target.value)} required />
+                  <Label htmlFor="super-admin-email">Email</Label>
+                  <Input id="super-admin-email" name="super_admin_email" type="email" value={newSAEmail} onChange={e => setNewSAEmail(e.target.value)} required />
                 </div>
                 <div className="space-y-2">
-                  <Label>Password</Label>
-                  <Input type="password" value={newSAPassword} onChange={e => setNewSAPassword(e.target.value)} required />
+                  <Label htmlFor="super-admin-password">Password</Label>
+                  <Input id="super-admin-password" name="super_admin_password" type="password" value={newSAPassword} onChange={e => setNewSAPassword(e.target.value)} minLength={8} autoComplete="new-password" required />
                 </div>
                 <Button type="submit" className="w-full bg-rose-600 hover:bg-rose-700" disabled={isCreatingSA}>
                   {isCreatingSA ? 'Creating...' : 'Create Super Admin'}

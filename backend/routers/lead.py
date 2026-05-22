@@ -31,7 +31,7 @@ def calculate_lead_score(lead: Lead) -> int:
     elif lead.source == "event": score += 10
     elif lead.source == "social": score += 5
     
-    if lead.status == "contacted": score += 10
+    if lead.status == "in_process": score += 10
     elif lead.status == "qualified": score += 20
     
     return min(100, score)
@@ -42,6 +42,70 @@ from models.project import Project
 from models.company import Company
 from models.contact import Contact
 import time
+
+async def sync_assigned_lead_project(lead: Lead, current_user: User, old_assigned_to: Optional[PydanticObjectId] = None) -> None:
+    """Ensure an assigned lead is visible in Projects if status != 'new'."""
+    existing_project = await Project.find_one(
+        Project.linked_lead_id == lead.id,
+        Project.org_id == lead.org_id
+    )
+
+    should_have_project = lead.assigned_to is not None and lead.status != "new"
+
+    if not should_have_project:
+        # If it shouldn't have a project, soft-delete it if it exists
+        if existing_project and not existing_project.is_deleted:
+            existing_project.is_deleted = True
+            existing_project.deleted_at = utc_now()
+            existing_project.deleted_by = current_user.id
+            await existing_project.save()
+        return
+
+    # If it should have a project
+    client_name = lead.company or lead.name
+    if existing_project:
+        # Restore if it was soft-deleted
+        existing_project.is_deleted = False
+        existing_project.deleted_at = None
+        existing_project.deleted_by = None
+        
+        # Update assignees
+        if old_assigned_to and old_assigned_to in existing_project.assignee_ids:
+            existing_project.assignee_ids.remove(old_assigned_to)
+            
+        if lead.assigned_to not in existing_project.assignee_ids:
+            existing_project.assignee_ids.append(lead.assigned_to)
+            
+        existing_project.client_name = client_name
+        existing_project.budget = lead.value or existing_project.budget
+        existing_project.updated_at = utc_now()
+        existing_project.updated_by = current_user.id
+        
+        # Ensure title reflects if it's converted or not
+        if lead.status == "converted":
+            existing_project.title = f"Project: {client_name}"
+        else:
+            existing_project.title = f"Lead: {lead.name}"
+            
+        await existing_project.save()
+    else:
+        # Create a new project
+        title = f"Project: {client_name}" if lead.status == "converted" else f"Lead: {lead.name}"
+        project_code = f"P-{int(time.time())}" if lead.status == "converted" else f"L-{str(lead.id)[-6:].upper()}"
+        
+        new_project = Project(
+            project_code=project_code,
+            title=title,
+            client_name=client_name,
+            status="planning",
+            budget=lead.value,
+            assignee_ids=[lead.assigned_to],
+            linked_lead_id=lead.id,
+            org_id=lead.org_id,
+            created_by=current_user.id
+        )
+        await new_project.insert()
+
 
 @router.post("", response_model=SuccessResponse)
 async def create_lead(
@@ -69,9 +133,10 @@ async def create_lead(
     
     await lead.insert()
     await log_action(str(org.id) if org else None, str(current_user.id), "create", "leads", str(lead.id))
+    await sync_assigned_lead_project(lead, current_user)
     
     # Automation based on status
-    if lead.status == "converted":
+    if lead.status != "new":
         company_name = lead.company if lead.company else lead.name
         new_company = Company(
             name=company_name,
@@ -79,22 +144,10 @@ async def create_lead(
             phone=lead.phone,
             assigned_to=lead.assigned_to,
             org_id=lead.org_id,
-            created_by=current_user.id
+            created_by=current_user.id,
+            linked_lead_id=lead.id
         )
         await new_company.insert()
-        
-        project_code = f"P-{int(time.time())}"
-        new_project = Project(
-            project_code=project_code,
-            title=f"Project: {company_name}",
-            client_name=company_name,
-            status="planning",
-            budget=lead.value,
-            assignee_ids=[lead.assigned_to] if lead.assigned_to else [],
-            org_id=lead.org_id,
-            created_by=current_user.id
-        )
-        await new_project.insert()
     else:
         name_parts = lead.name.split(" ", 1)
         first_name = name_parts[0]
@@ -109,7 +162,8 @@ async def create_lead(
             lead_source=lead.source,
             assigned_to=lead.assigned_to,
             org_id=lead.org_id,
-            created_by=current_user.id
+            created_by=current_user.id,
+            linked_lead_id=lead.id
         )
         await new_contact.insert()
     
@@ -186,6 +240,7 @@ async def update_lead(
         raise HTTPException(status_code=404, detail="Lead not found")
         
     old_status = lead.status
+    old_assigned_to = lead.assigned_to
     
     update_data = data.model_dump(exclude_unset=True)
     if "assigned_to" in update_data:
@@ -206,46 +261,98 @@ async def update_lead(
         
     new_status = lead.status
     
-    if old_status != "converted" and new_status == "converted":
-        import time
+    if old_status == "new" and new_status != "new":
+        # Convert Contact to Company
+        contact = await Contact.find_one(Contact.linked_lead_id == lead.id, Contact.org_id == lead.org_id, Contact.is_deleted == False)
+        if contact:
+            contact.is_deleted = True
+            await contact.save()
+            
         company_name = lead.company if lead.company else lead.name
-        existing_company = await Company.find_one({"name": company_name, "org_id": lead.org_id, "is_deleted": False})
-        if not existing_company:
+        existing_company = await Company.find_one(Company.linked_lead_id == lead.id, Company.org_id == lead.org_id)
+        if existing_company:
+            existing_company.is_deleted = False
+            existing_company.name = company_name
+            existing_company.email = lead.email
+            existing_company.phone = lead.phone
+            existing_company.assigned_to = lead.assigned_to
+            existing_company.contact_name = lead.name
+            existing_company.annual_revenue = lead.value
+            await existing_company.save()
+        else:
             new_company = Company(
                 name=company_name,
                 email=lead.email,
                 phone=lead.phone,
                 assigned_to=lead.assigned_to,
                 org_id=lead.org_id,
-                created_by=current_user.id
+                created_by=current_user.id,
+                linked_lead_id=lead.id,
+                contact_name=lead.name,
+                annual_revenue=lead.value
             )
             await new_company.insert()
             
-        project_code = f"P-{int(time.time())}"
-        new_project = Project(
-            project_code=project_code,
-            title=f"Project: {company_name}",
-            client_name=company_name,
-            status="planning",
-            budget=lead.value,
-            assignee_ids=[lead.assigned_to] if lead.assigned_to else [],
-            org_id=lead.org_id,
-            created_by=current_user.id
-        )
-        await new_project.insert()
+    elif old_status != "new" and new_status == "new":
+        # Convert Company to Contact
+        company = await Company.find_one(Company.linked_lead_id == lead.id, Company.org_id == lead.org_id, Company.is_deleted == False)
+        if company:
+            company.is_deleted = True
+            await company.save()
+            
+        name_parts = lead.name.split(" ", 1)
+        first_name = name_parts[0]
+        last_name = name_parts[1] if len(name_parts) > 1 else ""
         
-    elif old_status == "converted" and new_status != "converted":
-        company_name = lead.company if lead.company else lead.name
-        projects = await Project.find(
-            Project.org_id == lead.org_id,
-            Project.client_name == company_name,
-            Project.is_deleted == False
-        ).to_list()
-        for p in projects:
-            p.is_deleted = True
-            p.deleted_at = utc_now()
-            p.deleted_by = current_user.id
-            await p.save()
+        existing_contact = await Contact.find_one(Contact.linked_lead_id == lead.id, Contact.org_id == lead.org_id)
+        if existing_contact:
+            existing_contact.is_deleted = False
+            existing_contact.first_name = first_name
+            existing_contact.last_name = last_name
+            existing_contact.email = lead.email
+            existing_contact.phone = lead.phone
+            existing_contact.job_title = lead.job_title
+            existing_contact.assigned_to = lead.assigned_to
+            await existing_contact.save()
+        else:
+            new_contact = Contact(
+                first_name=first_name,
+                last_name=last_name,
+                email=lead.email,
+                phone=lead.phone,
+                job_title=lead.job_title,
+                lead_source=lead.source,
+                assigned_to=lead.assigned_to,
+                org_id=lead.org_id,
+                created_by=current_user.id,
+                linked_lead_id=lead.id
+            )
+            await new_contact.insert()
+            
+    else:
+        # Sync fields dynamically
+        if new_status == "new":
+            contact = await Contact.find_one(Contact.linked_lead_id == lead.id, Contact.org_id == lead.org_id, Contact.is_deleted == False)
+            if contact:
+                name_parts = lead.name.split(" ", 1)
+                contact.first_name = name_parts[0]
+                contact.last_name = name_parts[1] if len(name_parts) > 1 else ""
+                contact.email = lead.email
+                contact.phone = lead.phone
+                contact.job_title = lead.job_title
+                contact.assigned_to = lead.assigned_to
+                await contact.save()
+        else:
+            company_name = lead.company if lead.company else lead.name
+            company = await Company.find_one(Company.linked_lead_id == lead.id, Company.org_id == lead.org_id, Company.is_deleted == False)
+            if company:
+                company.name = company_name
+                company.email = lead.email
+                company.phone = lead.phone
+                company.assigned_to = lead.assigned_to
+                company.contact_name = lead.name
+                company.annual_revenue = lead.value
+                await company.save()
         
     new_score = calculate_lead_score(lead)
     if new_score != lead.score:
@@ -259,12 +366,11 @@ async def update_lead(
     lead.updated_by = current_user.id
     lead.updated_at = utc_now()
     await lead.save()
+    await sync_assigned_lead_project(lead, current_user, old_assigned_to)
     
     await log_action(str(org.id) if org else None, str(current_user.id), "update", "leads", str(lead.id), changes=update_data)
     
     return SuccessResponse(message="Lead updated successfully")
-
-
 @router.delete("/{lead_id}", response_model=SuccessResponse)
 async def delete_lead(
     lead_id: str,
@@ -297,6 +403,10 @@ async def bulk_assign_leads(
     await Lead.find(
         org_filter(org, {"_id": {"$in": lead_ids}})
     ).update({"$set": {"assigned_to": assigned_to, "updated_at": utc_now(), "updated_by": current_user.id}})
+
+    assigned_leads = await Lead.find(org_filter(org, {"_id": {"$in": lead_ids}})).to_list()
+    for lead in assigned_leads:
+        await sync_assigned_lead_project(lead, current_user)
     
     await log_action(str(org.id) if org else None, str(current_user.id), "bulk_update", "leads", changes={"action": "bulk_assign", "count": len(lead_ids)})
     

@@ -15,15 +15,18 @@ import {
   FileText,
   CreditCard,
   Briefcase,
-  Inbox
+  Inbox,
+  Trash2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
 import { apiClient } from '@/lib/axios';
 import NewEmployeeDialog from '@/components/NewEmployeeDialog';
+import { useAuthStore } from '@/store/authStore';
 
 export default function Employees() {
+  const { user } = useAuthStore();
   const [employees, setEmployees] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -61,6 +64,8 @@ export default function Employees() {
     }
   };
 
+  void formatDate;
+
   const getInitialsColor = (name: string) => {
     const colors = [
       'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400',
@@ -75,6 +80,17 @@ export default function Employees() {
       sum += name.charCodeAt(i);
     }
     return colors[sum % colors.length];
+  };
+
+  const handleDeleteEmployee = async (employeeId: string, employeeName: string) => {
+    if (!window.confirm(`Delete employee "${employeeName}"? This will deactivate their user login if one exists.`)) return;
+    try {
+      await apiClient.delete(`/employees/${employeeId}`);
+      toast.success('Employee deleted successfully');
+      await fetchEmployees();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.detail || 'Failed to delete employee');
+    }
   };
 
   return (
@@ -226,6 +242,17 @@ export default function Employees() {
                   key={emp.id} 
                   className="group relative bg-white dark:bg-gray-950 border border-gray-100 dark:border-gray-900 rounded-3xl p-6 hover:shadow-xl hover:shadow-purple-500/5 hover:-translate-y-1 transition-all duration-300 overflow-hidden"
                 >
+                  {user?.role === 'super_admin' && (
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteEmployee(emp.id, emp.name)}
+                      className="absolute top-4 right-4 z-20 h-8 w-8 rounded-xl flex items-center justify-center text-gray-300 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 opacity-0 group-hover:opacity-100 transition-all"
+                      aria-label={`Delete ${emp.name}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  )}
+
                   {/* Subtle glass gradient on hover */}
                   <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-indigo-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                   

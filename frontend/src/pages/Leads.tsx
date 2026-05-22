@@ -38,15 +38,14 @@ const sourceColors: Record<string, string> = {
 
 const statusColors: Record<string, string> = {
   new: 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400',
-  contacted: 'bg-orange-50 text-orange-600 dark:bg-orange-900/20 dark:text-orange-400',
   qualified: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400',
-  unqualified: 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400',
-  converted: 'bg-purple-50 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400',
+  in_process: 'bg-purple-50 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400',
+  converted: 'bg-orange-50 text-orange-600 dark:bg-orange-900/20 dark:text-orange-400',
 };
 
 export default function Leads() {
   const [leads, setLeads] = useState<Lead[]>([]);
-  const [total, setTotal] = useState(0);
+  const [projects, setProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -58,14 +57,17 @@ export default function Leads() {
     try {
       const params: Record<string, string> = { per_page: '50' };
       if (search.trim()) params.search = search.trim();
-      const res = await apiClient.get('/leads', { params });
-      setLeads(res.data.data || []);
-      setTotal(res.data.total || 0);
+      const [leadsRes, projRes] = await Promise.all([
+        apiClient.get('/leads', { params }),
+        apiClient.get('/projects', { params: { per_page: 500 } })
+      ]);
+      setLeads(leadsRes.data.data || []);
+      setProjects(projRes.data.data || []);
     } catch (err: any) {
       // If not authenticated or no org, show empty state
-      console.warn('Could not fetch leads:', err?.response?.status);
+      console.warn('Could not fetch leads/projects:', err?.response?.status);
       setLeads([]);
-      setTotal(0);
+      setProjects([]);
     } finally {
       setLoading(false);
     }
@@ -75,12 +77,16 @@ export default function Leads() {
     fetchLeads();
   }, [fetchLeads]);
 
+  const getEffectiveStatus = (lead: Lead) => {
+    return lead.status;
+  };
+
   // Compute stats from live data
   const stats = {
-    total: total,
-    qualified: leads.filter(l => l.status === 'qualified').length,
-    inProgress: leads.filter(l => ['new', 'contacted'].includes(l.status)).length,
-    converted: leads.filter(l => l.status === 'converted').length,
+    new: leads.filter(l => getEffectiveStatus(l) === 'new').length,
+    qualified: leads.filter(l => getEffectiveStatus(l) === 'qualified').length,
+    inProgress: leads.filter(l => getEffectiveStatus(l) === 'in_process').length,
+    converted: leads.filter(l => getEffectiveStatus(l) === 'converted').length,
   };
 
   const formatDate = (dateStr: string) => {
@@ -113,9 +119,9 @@ export default function Leads() {
       {/* Metric Cards — Live Data */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {[
-          { label: 'Total Leads', value: stats.total.toString(), icon: Target, bg: 'bg-purple-100 dark:bg-purple-900/30', fg: 'text-purple-600 dark:text-purple-400' },
-          { label: 'Qualified', value: stats.qualified.toString(), icon: CheckCircle, bg: 'bg-blue-100 dark:bg-blue-900/30', fg: 'text-blue-600 dark:text-blue-400' },
-          { label: 'In Progress', value: stats.inProgress.toString(), icon: Users, bg: 'bg-emerald-100 dark:bg-emerald-900/30', fg: 'text-emerald-600 dark:text-emerald-400' },
+          { label: 'New Lead', value: stats.new.toString(), icon: Target, bg: 'bg-blue-100 dark:bg-blue-900/30', fg: 'text-blue-600 dark:text-blue-400' },
+          { label: 'Qualified', value: stats.qualified.toString(), icon: CheckCircle, bg: 'bg-emerald-100 dark:bg-emerald-900/30', fg: 'text-emerald-600 dark:text-emerald-400' },
+          { label: 'In Process', value: stats.inProgress.toString(), icon: Users, bg: 'bg-purple-100 dark:bg-purple-900/30', fg: 'text-purple-600 dark:text-purple-400' },
           { label: 'Converted', value: stats.converted.toString(), icon: TrendingUp, bg: 'bg-orange-100 dark:bg-orange-900/30', fg: 'text-orange-600 dark:text-orange-400' },
         ].map((stat, i) => (
           <Card key={i} className="border-0 shadow-sm rounded-2xl bg-white dark:bg-gray-950">
@@ -139,9 +145,12 @@ export default function Leads() {
           <div className="relative w-full sm:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
+              id="leads-search"
+              name="leads_search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search leads..."
+              autoComplete="off"
               className="pl-9 rounded-xl border-gray-200 dark:border-gray-800 h-9 bg-gray-50/50 dark:bg-gray-900/50"
             />
           </div>
@@ -204,7 +213,9 @@ export default function Leads() {
                       </div>
                     </td>
                     <td className="px-6 py-4 text-center">
-                      <span className={cn("px-2.5 py-1 rounded-full text-xs font-bold capitalize", statusColors[l.status] || statusColors.new)}>{l.status}</span>
+                      <span className={cn("px-2.5 py-1 rounded-full text-xs font-bold capitalize", statusColors[getEffectiveStatus(l)] || statusColors.new)}>
+                        {getEffectiveStatus(l).replace('_', ' ')}
+                      </span>
                     </td>
                     <td className="px-6 py-4 text-gray-500">{formatDate(l.created_at)}</td>
                   </tr>

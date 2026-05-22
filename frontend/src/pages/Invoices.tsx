@@ -115,7 +115,7 @@ export default function Invoices() {
                 {invoices.map((inv, i) => (
                   <tr key={inv.id || i} className="hover:bg-gray-50/50 dark:hover:bg-gray-900/50 transition-colors cursor-pointer">
                     <td className="px-6 py-4 font-bold text-gray-700 dark:text-gray-300">{inv.invoice_number || `INV-${inv.id.substring(0,6)}`}</td>
-                    <td className="px-6 py-4 font-medium text-gray-900 dark:text-gray-100">{inv.company_id || inv.contact_id || 'Unknown'}</td>
+                    <td className="px-6 py-4 font-medium text-gray-900 dark:text-gray-100">{inv.customer_name || inv.company_id || inv.contact_id || 'Unknown'}</td>
                     <td className="px-6 py-4 text-right font-bold text-blue-600 dark:text-blue-400">{formatINR(inv.total)}</td>
                     <td className="px-6 py-4 text-gray-500">{new Date(inv.created_at).toLocaleDateString()}</td>
                     <td className="px-6 py-4 text-gray-500">{inv.due_date ? new Date(inv.due_date).toLocaleDateString() : 'N/A'}</td>

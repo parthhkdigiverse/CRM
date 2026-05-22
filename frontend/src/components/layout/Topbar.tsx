@@ -58,7 +58,10 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
             <Search className="h-4 w-4" />
           </div>
           <Input 
+            id="global-search"
+            name="global_search"
             type="text" 
+            autoComplete="off"
             placeholder="Search clients, leads, invoices..." 
             className="pl-9 bg-gray-50/50 dark:bg-gray-900/50 border-gray-200 dark:border-gray-800 w-full rounded-xl h-9"
           />

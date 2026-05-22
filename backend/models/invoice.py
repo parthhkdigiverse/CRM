@@ -26,6 +26,7 @@ class Invoice(Document):
     invoice_number: str  # Auto-generated: INV-YYYY-XXXX
     contact_id: Optional[PydanticObjectId] = None
     company_id: Optional[PydanticObjectId] = None
+    customer_name: Optional[str] = None
     line_items: List[LineItem] = Field(default_factory=list)
     subtotal: float = 0.0
     tax_amount: float = 0.0

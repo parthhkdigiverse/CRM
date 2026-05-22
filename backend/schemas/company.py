@@ -18,6 +18,7 @@ class CompanyCreate(BaseModel):
     address: Optional[Dict] = None
     annual_revenue: Optional[float] = None
     assigned_to: Optional[str] = None
+    contact_name: Optional[str] = None
     tags: List[str] = []
     notes: Optional[str] = None
 
@@ -32,6 +33,7 @@ class CompanyUpdate(BaseModel):
     address: Optional[Dict] = None
     annual_revenue: Optional[float] = None
     assigned_to: Optional[str] = None
+    contact_name: Optional[str] = None
     tags: Optional[List[str]] = None
     notes: Optional[str] = None
 
@@ -47,7 +49,9 @@ class CompanyResponse(BaseModel):
     address: Optional[Dict] = None
     annual_revenue: Optional[float] = None
     assigned_to: Optional[str] = None
+    contact_name: Optional[str] = None
     tags: List[str] = []
     notes: Optional[str] = None
+    linked_lead_id: Optional[str] = None
     created_at: datetime
     updated_at: datetime

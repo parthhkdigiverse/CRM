@@ -21,6 +21,9 @@ class EmployeeCreate(BaseModel):
     reporting_to: Optional[str] = None
     avatar_url: Optional[str] = None
     user_id: Optional[str] = None
+    address: Optional[str] = None
+    skills: Optional[str] = None
+    notes: Optional[str] = None
 
 
 class EmployeeUpdate(BaseModel):
@@ -34,6 +37,9 @@ class EmployeeUpdate(BaseModel):
     status: Optional[str] = None
     reporting_to: Optional[str] = None
     avatar_url: Optional[str] = None
+    address: Optional[str] = None
+    skills: Optional[str] = None
+    notes: Optional[str] = None
 
 
 class EmployeeResponse(BaseModel):
@@ -49,5 +55,8 @@ class EmployeeResponse(BaseModel):
     status: str
     reporting_to: Optional[str] = None
     avatar_url: Optional[str] = None
+    address: Optional[str] = None
+    skills: Optional[str] = None
+    notes: Optional[str] = None
     created_at: datetime
     updated_at: datetime

@@ -65,6 +65,7 @@ export default function NewInvoiceDialog({ open, onOpenChange, onCreated }: Prop
     setLoading(true);
     try {
       const payload: Record<string, any> = {
+        customer_name: form.customer.trim(),
         status: form.status,
         discount: parseFloat(form.discount) || 0,
         currency: 'INR',

@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { apiClient } from '@/lib/axios';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
@@ -25,20 +25,28 @@ const sources = [
 
 const statuses = [
   { value: 'new', label: 'New' },
-  { value: 'contacted', label: 'Contacted' },
   { value: 'qualified', label: 'Qualified' },
+  { value: 'in_process', label: 'In Process' },
   { value: 'converted', label: 'Converted' },
-  { value: 'unqualified', label: 'Unqualified' },
 ];
 
 const emptyForm = {
-  name: '', phone: '', source: 'website', status: 'new', assigned_to: '',
-  follow_up_date: '', notes: '', email: '', company: '', value: '', job_title: '', address: '',
+  name: '', phone: '', source: 'website', status: 'new',
+  email: '', company: '', value: '', job_title: '', address: '',
 };
 
 export default function NewLeadDialog({ open, onOpenChange, onLeadCreated }: NewLeadDialogProps) {
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({ ...emptyForm });
+  const [employees, setEmployees] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (open) {
+      apiClient.get('/employees?per_page=100').then((res) => {
+        setEmployees(res.data.data || []);
+      }).catch(console.error);
+    }
+  }, [open]);
 
   const u = (field: string, value: string) => setForm((p) => ({ ...p, [field]: value }));
 
@@ -51,16 +59,13 @@ export default function NewLeadDialog({ open, onOpenChange, onLeadCreated }: New
       const payload: Record<string, any> = {
         name: form.name.trim(),
         source: form.source,
-        status: form.status,
+        status: 'new', // Always 'new' for new leads
       };
       if (form.phone.trim()) payload.phone = form.phone.trim();
       if (form.email.trim()) payload.email = form.email.trim();
       if (form.company.trim()) payload.company = form.company.trim();
       if (form.job_title.trim()) payload.job_title = form.job_title.trim();
-      if (form.assigned_to.trim()) payload.assigned_to = form.assigned_to.trim();
       if (form.value) payload.value = parseFloat(form.value) || 0;
-      if (form.notes.trim()) payload.notes = form.notes.trim();
-      if (form.follow_up_date) payload.follow_up_date = form.follow_up_date;
 
       await apiClient.post('/leads', payload);
       toast.success('Lead created successfully! 🎉');
@@ -112,22 +117,6 @@ export default function NewLeadDialog({ open, onOpenChange, onLeadCreated }: New
 
       <FormField label="Source">
         <ChipSelect options={sources} value={form.source} onChange={(v) => u('source', v)} />
-      </FormField>
-
-      <FormField label="Status">
-        <ChipSelect options={statuses} value={form.status} onChange={(v) => u('status', v)} />
-      </FormField>
-
-      <FormField label="Assigned To">
-        <Input value={form.assigned_to} onChange={(e) => u('assigned_to', e.target.value)} placeholder="Team member name" className={inputClass} />
-      </FormField>
-
-      <FormField label="Next Follow-up">
-        <Input type="date" value={form.follow_up_date} onChange={(e) => u('follow_up_date', e.target.value)} className={inputClass} />
-      </FormField>
-
-      <FormField label="Notes">
-        <textarea value={form.notes} onChange={(e) => u('notes', e.target.value)} placeholder="Any initial notes..." rows={2} className={textareaClass} />
       </FormField>
 
       {/* More Details */}

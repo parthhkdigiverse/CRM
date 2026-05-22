@@ -213,6 +213,17 @@ async def delete_employee(
     employee.deleted_at = utc_now()
     employee.deleted_by = current_user.id
     await employee.save()
+
+    if employee.user_id:
+        linked_user = await User.get(employee.user_id)
+        if linked_user:
+            linked_user.is_active = False
+            linked_user.is_deleted = True
+            linked_user.deleted_at = utc_now()
+            linked_user.deleted_by = current_user.id
+            linked_user.updated_at = utc_now()
+            linked_user.updated_by = current_user.id
+            await linked_user.save()
     
     await log_action(str(org.id) if org else "super_admin", str(current_user.id), "delete", "employees", str(employee.id))
     

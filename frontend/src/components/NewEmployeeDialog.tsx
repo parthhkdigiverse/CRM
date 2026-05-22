@@ -51,6 +51,9 @@ export default function NewEmployeeDialog({ open, onOpenChange, onEmployeeCreate
       };
       if (form.phone.trim()) payload.phone = form.phone.trim();
       if (form.manager.trim()) payload.reporting_to = form.manager.trim();
+      if (form.address.trim()) payload.address = form.address.trim();
+      if (form.skills.trim()) payload.skills = form.skills.trim();
+      if (form.notes.trim()) payload.notes = form.notes.trim();
       const salaryFloat = parseFloat(form.salary);
       if (!isNaN(salaryFloat)) payload.salary = salaryFloat;
 

@@ -395,7 +395,10 @@ function TeamMembersView() {
 
 export default function Settings() {
   const [activeTab, setActiveTab] = useState('profile');
-  const { organization, updateUser } = useAuthStore();
+  const { user, organization, updateUser } = useAuthStore();
+  
+  const isRestricted = user?.role === 'employee' || user?.role === 'hr';
+  const visibleTabs = isRestricted ? tabs.filter(t => t.id === 'profile') : tabs;
 
   // Profile Form State
   const [firstName, setFirstName] = useState('');
@@ -540,7 +543,7 @@ export default function Settings() {
         {/* Sidebar Tabs */}
         <div className="md:w-56 shrink-0">
           <nav className="space-y-1">
-            {tabs.map((tab) => (
+            {visibleTabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
@@ -765,13 +768,13 @@ export default function Settings() {
               <CardContent className="p-12 text-center">
                 <div className="h-14 w-14 bg-gray-100 dark:bg-gray-900 rounded-2xl flex items-center justify-center mx-auto mb-4">
                   {(() => {
-                    const tab = tabs.find(t => t.id === activeTab);
+                    const tab = visibleTabs.find(t => t.id === activeTab);
                     const Icon = tab?.icon || User;
                     return <Icon className="h-7 w-7 text-gray-400" />;
                   })()}
                 </div>
                 <h3 className="font-bold text-gray-900 dark:text-white mb-2">
-                  {tabs.find(t => t.id === activeTab)?.label} Settings
+                  {visibleTabs.find(t => t.id === activeTab)?.label} Settings
                 </h3>
                 <p className="text-gray-500 text-sm mb-6">This section is being built. Check back soon!</p>
                 <Button variant="outline" className="rounded-xl" onClick={() => toast('Coming soon!')}>

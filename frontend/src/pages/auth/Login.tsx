@@ -47,6 +47,9 @@ export default function Login() {
         full_name: `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email,
         role: user.role,
         org_id: user.org_id,
+        avatar_url: user.avatar_url,
+        first_name: user.first_name,
+        last_name: user.last_name,
       };
 
       const org = user.org_id ? { id: user.org_id, name: 'My Organization' } : undefined;

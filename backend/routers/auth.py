@@ -281,7 +281,7 @@ async def upload_avatar(
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
         
-    avatar_url = f"{settings.FRONTEND_URL.replace('5173', '8000')}/storage/avatars/{file_name}"
+    avatar_url = f"{settings.BACKEND_URL}/storage/avatars/{file_name}"
     
     current_user.avatar_url = avatar_url
     current_user.updated_at = utc_now()

@@ -4,7 +4,7 @@ Chat router — Full WhatsApp-style real-time messaging with typing, read receip
 
 import logging
 from typing import List, Dict, Optional, Set
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status, WebSocket, WebSocketDisconnect, Query
 from beanie import PydanticObjectId
@@ -25,6 +25,10 @@ router = APIRouter(prefix="/api/v1/chat", tags=["Chat"])
 class CreateGroupRequest(BaseModel):
     name: str
     participant_ids: List[str]
+
+
+class EditMessageRequest(BaseModel):
+    content: str
 
 
 # ── WebSocket Connection Manager ────────────────────────────────────
@@ -76,6 +80,38 @@ async def _build_user_lookup(participant_ids: list) -> dict:
         if e.user_id:
             lookup[str(e.user_id)] = {"id": str(e.user_id), "name": e.name, "role": e.role or "employee", "avatar": e.avatar_url}
     return lookup
+
+
+def _message_payload(message: ChatMessage, sender_name: str = "Unknown") -> dict:
+    return {
+        "id": str(message.id),
+        "room_id": str(message.room_id),
+        "sender_id": str(message.sender_id),
+        "sender_name": sender_name,
+        "content": message.content,
+        "created_at": message.created_at.isoformat(),
+        "updated_at": message.updated_at.isoformat() if getattr(message, "updated_at", None) else None,
+        "edited_at": message.edited_at.isoformat() if getattr(message, "edited_at", None) else None,
+        "is_read": message.is_read,
+        "reply_to_id": str(message.reply_to_id) if getattr(message, "reply_to_id", None) else None,
+        "reply_to_content": None,
+    }
+
+
+async def _broadcast_to_room(room: ChatRoom, payload: dict):
+    for pid in room.participants:
+        await manager.send_to_user(payload, str(pid))
+
+
+async def _refresh_room_last_message(room: ChatRoom):
+    last_msg = await ChatMessage.find(ChatMessage.room_id == room.id).sort("-created_at").first_or_none()
+    room.last_message_at = last_msg.created_at if last_msg else datetime.now(timezone.utc)
+    room.updated_at = datetime.now(timezone.utc)
+    await room.save()
+
+
+def _aware_utc(dt: datetime) -> datetime:
+    return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt.astimezone(timezone.utc)
 
 
 # ── REST Endpoints ──────────────────────────────────────────────────
@@ -146,7 +182,7 @@ async def get_chat_rooms(current_user: User = Depends(get_current_user)):
             "room_type": room.room_type,
             "name": room.name,
             "participants": [str(p) for p in room.participants],
-            "participants_details": [lookup.get(str(p), {"id": str(p), "name": "Unknown"}) for p in room.participants],
+            "participants_details": [lookup.get(str(p), {"id": str(p), "name": "Unknown", "role": "unknown", "avatar": None}) for p in room.participants],
             "last_message_at": room.last_message_at.isoformat() if room.last_message_at else None,
             "last_message": last_msg.content[:80] if last_msg else None,
             "last_message_sender": str(last_msg.sender_id) if last_msg else None,
@@ -214,17 +250,7 @@ async def get_messages(room_id: PydanticObjectId, current_user: User = Depends(g
     result = []
     for m in msgs:
         sender = lookup.get(str(m.sender_id), {"name": "Unknown"})
-        result.append({
-            "id": str(m.id),
-            "room_id": str(m.room_id),
-            "sender_id": str(m.sender_id),
-            "sender_name": sender["name"],
-            "content": m.content,
-            "created_at": m.created_at.isoformat(),
-            "is_read": m.is_read,
-            "reply_to_id": str(m.reply_to_id) if hasattr(m, 'reply_to_id') and m.reply_to_id else None,
-            "reply_to_content": None,
-        })
+        result.append(_message_payload(m, sender["name"]))
 
     # Populate reply previews
     reply_ids = [r["reply_to_id"] for r in result if r["reply_to_id"]]
@@ -239,6 +265,74 @@ async def get_messages(room_id: PydanticObjectId, current_user: User = Depends(g
 
 
 # ── WebSocket ───────────────────────────────────────────────────────
+
+@router.patch("/messages/{message_id}")
+async def edit_message(message_id: PydanticObjectId, body: EditMessageRequest, current_user: User = Depends(get_current_user)):
+    content = body.content.strip()
+    if not content:
+        raise HTTPException(status_code=400, detail="Message cannot be empty")
+
+    msg = await ChatMessage.get(message_id)
+    if not msg:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    room = await ChatRoom.get(msg.room_id)
+    if not room or current_user.id not in room.participants:
+        raise HTTPException(status_code=404, detail="Room not found or access denied")
+    if msg.sender_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You can edit only your own messages")
+    if datetime.now(timezone.utc) - _aware_utc(msg.created_at) > timedelta(minutes=5):
+        raise HTTPException(status_code=400, detail="Messages can only be edited within 5 minutes")
+
+    msg.content = content
+    msg.edited_at = datetime.now(timezone.utc)
+    msg.updated_at = msg.edited_at
+    await msg.save()
+
+    sender_name = current_user.full_name.strip() or current_user.email
+    payload = {"type": "message_edited", "data": _message_payload(msg, sender_name)}
+    await _broadcast_to_room(room, payload)
+    return {"success": True, "data": payload["data"], "message": "Message edited"}
+
+
+@router.delete("/messages/{message_id}")
+async def delete_message(message_id: PydanticObjectId, current_user: User = Depends(get_current_user)):
+    msg = await ChatMessage.get(message_id)
+    if not msg:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    room = await ChatRoom.get(msg.room_id)
+    if not room or current_user.id not in room.participants:
+        raise HTTPException(status_code=404, detail="Room not found or access denied")
+    if msg.sender_id != current_user.id and current_user.role not in ["super_admin", "admin"]:
+        raise HTTPException(status_code=403, detail="You can delete only your own messages")
+
+    room_id = str(room.id)
+    await msg.delete()
+    await _refresh_room_last_message(room)
+    await _broadcast_to_room(room, {
+        "type": "message_deleted",
+        "data": {"id": str(message_id), "room_id": room_id}
+    })
+    return {"success": True, "message": "Message deleted"}
+
+
+@router.delete("/rooms/{room_id}")
+async def delete_room(room_id: PydanticObjectId, current_user: User = Depends(get_current_user)):
+    room = await ChatRoom.get(room_id)
+    if not room or current_user.id not in room.participants:
+        raise HTTPException(status_code=404, detail="Room not found or access denied")
+
+    participant_ids = [str(pid) for pid in room.participants]
+    await ChatMessage.find(ChatMessage.room_id == room_id).delete()
+    await room.delete()
+    for pid in participant_ids:
+        await manager.send_to_user({
+            "type": "room_deleted",
+            "data": {"room_id": str(room_id)}
+        }, pid)
+    return {"success": True, "message": "Chat deleted"}
+
 
 @router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket, token: str = Query(...)):
@@ -313,13 +407,14 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(...)):
                         "sender_name": sender_name,
                         "content": content,
                         "created_at": new_msg.created_at.isoformat(),
+                        "updated_at": new_msg.updated_at.isoformat() if new_msg.updated_at else None,
+                        "edited_at": None,
                         "is_read": False,
                         "reply_to_id": reply_to,
                         "reply_to_content": reply_content,
                     }
                 }
-                for pid in room.participants:
-                    await manager.send_to_user(broadcast, str(pid))
+                await _broadcast_to_room(room, broadcast)
 
             elif action == "typing":
                 room_id_str = data.get("room_id")

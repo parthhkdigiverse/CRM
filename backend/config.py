@@ -46,6 +46,7 @@ class Settings(BaseSettings):
     # App
     APP_ENV: str = "development"
     FRONTEND_URL: str = "http://localhost:5173"
+    BACKEND_URL: str = "http://localhost:8000"
     ALLOWED_ORIGINS: str = "http://localhost:5173"
 
 

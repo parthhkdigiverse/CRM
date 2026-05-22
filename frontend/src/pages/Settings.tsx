@@ -617,8 +617,8 @@ export default function Settings() {
                           }}
                         />
                         <Avatar className="h-20 w-20">
-                          {useAuthStore.getState().user?.avatar_url && (
-                            <AvatarImage src={useAuthStore.getState().user?.avatar_url} alt="Avatar" className="object-cover" />
+                          {user?.avatar_url && (
+                            <AvatarImage src={user.avatar_url} alt="Avatar" className="object-cover" />
                           )}
                           <AvatarFallback className="bg-gradient-to-br from-purple-500 to-indigo-600 text-white text-xl font-bold">
                             {userInitials}

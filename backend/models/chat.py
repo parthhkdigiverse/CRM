@@ -39,10 +39,12 @@ class ChatMessage(Document):
     content: str
     is_read: bool = False
     reply_to_id: Optional[PydanticObjectId] = None  # Reply to another message
+    edited_at: Optional[datetime] = None
     
     # Base fields
     org_id: PydanticObjectId
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     class Settings:
         name = "chat_messages"

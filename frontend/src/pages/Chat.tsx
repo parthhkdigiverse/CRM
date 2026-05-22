@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Search, Send, Users, X, Check, CheckCheck, ArrowLeft, MessageSquare, Loader2, Smile, MoreVertical } from 'lucide-react';
+import { Search, Send, Users, X, Check, CheckCheck, ArrowLeft, MessageSquare, Loader2, Smile, MoreVertical, Copy, Edit3, Trash2 } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { apiClient } from '@/lib/axios';
 import { useAuthStore } from '@/store/authStore';
@@ -13,13 +14,68 @@ const bgColors = [
 ];
 const pickBg = (id: string) => bgColors[parseInt(id?.slice(-2) || '0', 16) % bgColors.length];
 
-const fmtTime = (iso: string) => {
-  const d = new Date(iso), now = new Date(), diff = now.getTime() - d.getTime();
-  if (diff < 86400000 && d.getDate() === now.getDate()) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  if (diff < 172800000) return 'Yesterday';
-  return d.toLocaleDateString([], { day: '2-digit', month: '2-digit', year: '2-digit' });
+type ChatMessageItem = {
+  id: string;
+  room_id: string;
+  sender_id: string;
+  sender_name?: string;
+  content: string;
+  created_at: string;
+  updated_at?: string | null;
+  edited_at?: string | null;
+  is_read?: boolean;
+  reply_to_id?: string | null;
+  reply_to_content?: string | null;
 };
-const fmtMsg = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+const INDIAN_TIME_ZONE = 'Asia/Kolkata';
+const indianDateKey = (date: Date) =>
+  new Intl.DateTimeFormat('en-CA', {
+    timeZone: INDIAN_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date);
+const indianTime = (date: Date) =>
+  date.toLocaleTimeString('en-IN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+    timeZone: INDIAN_TIME_ZONE,
+  });
+const indianDate = (date: Date) =>
+  date.toLocaleDateString('en-IN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: '2-digit',
+    timeZone: INDIAN_TIME_ZONE,
+  });
+const indianLongDate = (date: Date) =>
+  date.toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    timeZone: INDIAN_TIME_ZONE,
+  });
+const isTodayInIndia = (date: Date, now = new Date()) => indianDateKey(date) === indianDateKey(now);
+const isYesterdayInIndia = (date: Date, now = new Date()) => {
+  const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  return indianDateKey(date) === indianDateKey(yesterday);
+};
+
+const fmtTime = (iso: string) => {
+  const d = new Date(iso);
+  if (isTodayInIndia(d)) return indianTime(d);
+  if (isYesterdayInIndia(d)) return 'Yesterday';
+  return indianDate(d);
+};
+const fmtMsg = (iso: string) => indianTime(new Date(iso));
+const canEditMessage = (msg: ChatMessageItem, userId?: string) =>
+  msg.sender_id === userId && Date.now() - new Date(msg.created_at).getTime() <= 5 * 60 * 1000;
+const apiErrorMessage = (error: unknown, fallback: string) => {
+  const maybeError = error as { response?: { data?: { detail?: string } } };
+  return maybeError.response?.data?.detail || fallback;
+};
 
 const EMOJIS = ['😊','😂','❤️','👍','🙏','🔥','😮','😢','🎉','👏','✨','✅','🙌','💡','😍'];
 
@@ -38,10 +94,10 @@ function TypingDots() {
 
 /* Date separator */
 function DateBadge({ date }: { date: string }) {
-  const d = new Date(date), now = new Date(), diff = now.getTime() - d.getTime();
-  let label = d.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
-  if (diff < 86400000 && d.getDate() === now.getDate()) label = 'Today';
-  else if (diff < 172800000) label = 'Yesterday';
+  const d = new Date(date);
+  let label = indianLongDate(d);
+  if (isTodayInIndia(d)) label = 'Today';
+  else if (isYesterdayInIndia(d)) label = 'Yesterday';
   return (
     <div className="flex justify-center py-4 my-2 relative z-10">
       <span className="text-[12px] font-medium px-4 py-1 rounded-full shadow-sm border border-gray-200 dark:border-white/10 bg-white/90 dark:bg-slate-800/50 backdrop-blur-md text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -57,7 +113,7 @@ export default function Chat() {
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [rooms, setRooms] = useState<any[]>([]);
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<any[]>([]);
+  const [messages, setMessages] = useState<ChatMessageItem[]>([]);
   const [newMsg, setNewMsg] = useState('');
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -69,8 +125,10 @@ export default function Chat() {
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
   const [typingUsers, setTypingUsers] = useState<{ [k: string]: { name: string; ts: number } }>({});
   const [showEmoji, setShowEmoji] = useState(false);
+  const [editingMsg, setEditingMsg] = useState<ChatMessageItem | null>(null);
   
   const ws = useRef<WebSocket | null>(null);
+  const messagesScrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const activeRoomRef = useRef<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -89,14 +147,16 @@ export default function Chat() {
   }, []);
 
   useEffect(() => {
-    if (messages.length) {
-      setTimeout(() => {
-        const glassScroll = document.querySelector('.glass-scroll');
-        if (glassScroll) {
-          glassScroll.scrollTop = glassScroll.scrollHeight;
-        }
-      }, 50);
-    }
+    if (!messages.length) return;
+
+    requestAnimationFrame(() => {
+      bottomRef.current?.scrollIntoView({ block: 'end' });
+
+      const messagePane = messagesScrollRef.current;
+      if (messagePane) {
+        messagePane.scrollTop = messagePane.scrollHeight;
+      }
+    });
   }, [messages]);
 
   useEffect(() => {
@@ -127,6 +187,23 @@ export default function Chat() {
         if (p.data.room_id === activeRoomRef.current) setMessages(prev => prev.map(m => m.sender_id === user?.id ? { ...m, is_read: true } : m));
         apiClient.get('/chat/rooms').then(r => setRooms(r.data.data || [])).catch(() => { });
       }
+      if (p.type === 'message_edited') {
+        const edited = p.data;
+        setMessages(prev => prev.map(m => m.id === edited.id ? { ...m, ...edited } : m));
+        apiClient.get('/chat/rooms').then(r => setRooms(r.data.data || [])).catch(() => { });
+      }
+      if (p.type === 'message_deleted') {
+        setMessages(prev => prev.filter(m => m.id !== p.data.id));
+        apiClient.get('/chat/rooms').then(r => setRooms(r.data.data || [])).catch(() => { });
+      }
+      if (p.type === 'room_deleted') {
+        setRooms(prev => prev.filter(r => r.id !== p.data.room_id));
+        if (activeRoomRef.current === p.data.room_id) {
+          setActiveRoomId(null);
+          setMessages([]);
+          setMobileShowChat(false);
+        }
+      }
     };
     ws.current = socket;
     return () => socket.close();
@@ -135,7 +212,7 @@ export default function Chat() {
   const refreshRooms = async () => { const r = await apiClient.get('/chat/rooms'); setRooms(r.data.data || []); };
   
   const openRoom = useCallback(async (roomId: string) => {
-    setActiveRoomId(roomId); setMobileShowChat(true); setShowEmoji(false);
+    setActiveRoomId(roomId); setMobileShowChat(true); setShowEmoji(false); setEditingMsg(null); setNewMsg('');
     setRooms(prev => prev.map(r => r.id === roomId ? { ...r, unread_count: 0 } : r));
     try {
       const r = await apiClient.get(`/chat/messages/${roomId}`); setMessages(r.data.data || []);
@@ -153,9 +230,70 @@ export default function Chat() {
   
   const sendMessage = (e: React.FormEvent) => {
     e.preventDefault(); const text = newMsg.trim();
-    if (!text || !activeRoomId || !ws.current || ws.current.readyState !== WebSocket.OPEN) return;
+    if (!text || !activeRoomId) return;
+    if (editingMsg) {
+      apiClient.patch(`/chat/messages/${editingMsg.id}`, { content: text })
+        .then(r => {
+          const edited = r.data.data;
+          setMessages(prev => prev.map(m => m.id === edited.id ? { ...m, ...edited } : m));
+          setEditingMsg(null);
+          setNewMsg('');
+          setShowEmoji(false);
+        })
+        .catch(e => alert(apiErrorMessage(e, 'Unable to edit message')));
+      return;
+    }
+    if (!ws.current || ws.current.readyState !== WebSocket.OPEN) return;
     ws.current.send(JSON.stringify({ action: 'send_message', room_id: activeRoomId, content: text }));
     setNewMsg(''); setShowEmoji(false);
+  };
+
+  const copyMessage = async (content: string) => {
+    try {
+      await navigator.clipboard.writeText(content);
+    } catch {
+      alert('Unable to copy message');
+    }
+  };
+
+  const startEditMessage = (msg: ChatMessageItem) => {
+    if (!canEditMessage(msg, user?.id)) return;
+    setEditingMsg(msg);
+    setNewMsg(msg.content);
+    setShowEmoji(false);
+    setTimeout(() => inputRef.current?.focus(), 0);
+  };
+
+  const cancelEdit = () => {
+    setEditingMsg(null);
+    setNewMsg('');
+  };
+
+  const deleteMessage = async (msg: ChatMessageItem) => {
+    if (!confirm('Delete this message?')) return;
+    try {
+      await apiClient.delete(`/chat/messages/${msg.id}`);
+      setMessages(prev => prev.filter(m => m.id !== msg.id));
+      refreshRooms().catch(() => { });
+    } catch (e) {
+      alert(apiErrorMessage(e, 'Unable to delete message'));
+    }
+  };
+
+  const deleteChat = async () => {
+    if (!activeRoomId || !confirm('Delete this chat for everyone?')) return;
+    const roomId = activeRoomId;
+    try {
+      await apiClient.delete(`/chat/rooms/${roomId}`);
+      setRooms(prev => prev.filter(r => r.id !== roomId));
+      setActiveRoomId(null);
+      setMessages([]);
+      setMobileShowChat(false);
+      setEditingMsg(null);
+      setNewMsg('');
+    } catch (e) {
+      alert(apiErrorMessage(e, 'Unable to delete chat'));
+    }
   };
   
   const handleTyping = () => {
@@ -208,7 +346,7 @@ export default function Chat() {
             <div className="flex items-center gap-3">
               <Avatar className="h-[46px] w-[46px] shadow-sm border border-gray-100 dark:border-slate-700">
                 {user?.avatar_url && <AvatarImage src={user.avatar_url} alt="Profile" className="object-cover" />}
-                <AvatarFallback className="text-violet-600 dark:text-violet-400 text-sm font-bold bg-gray-50 dark:bg-slate-800">{ini(user?.name || user?.email || 'Me')}</AvatarFallback>
+                <AvatarFallback className="text-violet-600 dark:text-violet-400 text-sm font-bold bg-gray-50 dark:bg-slate-800">{ini(user?.full_name || user?.email || 'Me')}</AvatarFallback>
               </Avatar>
               <h2 className="text-[20px] font-bold text-gray-800 dark:bg-gradient-to-r dark:from-violet-400 dark:to-fuchsia-400 dark:bg-clip-text dark:text-transparent">Messages</h2>
             </div>
@@ -248,7 +386,7 @@ export default function Chat() {
                     className="w-full flex items-center gap-[14px] p-3 rounded-2xl hover:bg-gray-100 dark:hover:bg-slate-800/60 hover:shadow-sm transition-all border border-transparent hover:border-gray-200 dark:hover:border-white/10 group">
                     <div className="relative shrink-0">
                       <Avatar className="h-[52px] w-[52px] shadow-sm">
-                        {u.avatar && <AvatarImage src={u.avatar} alt="Profile" className="object-cover" />}
+                        {u.avatar?.trim() && <AvatarImage src={u.avatar} alt="Profile" className="object-cover" />}
                         <AvatarFallback className="text-gray-800 text-sm font-semibold" style={{ background: pickBg(u.id) }}>{ini(u.name)}</AvatarFallback>
                       </Avatar>
                     </div>
@@ -282,7 +420,7 @@ export default function Chat() {
                       return (
                         <span key={mid} className="inline-flex items-center gap-[6px] pl-1 pr-3 py-1 rounded-full text-[13px] font-medium bg-gray-50 dark:bg-slate-700 shadow-sm border border-gray-200 dark:border-slate-600">
                           <Avatar className="h-[24px] w-[24px]">
-                            {mu?.avatar && <AvatarImage src={mu.avatar} alt="Profile" className="object-cover" />}
+                            {mu?.avatar?.trim() && <AvatarImage src={mu.avatar} alt="Profile" className="object-cover" />}
                             <AvatarFallback className="text-[9px] text-gray-800" style={{ background: pickBg(mid) }}>{ini(mu?.name || '')}</AvatarFallback>
                           </Avatar>
                           <span className="text-gray-700 dark:text-gray-200">{mu?.name}</span>
@@ -308,7 +446,7 @@ export default function Chat() {
                       className={cn("w-full flex items-center gap-[14px] p-3 rounded-2xl transition-all border", sel ? "bg-white dark:bg-slate-700 border-violet-200 dark:border-violet-500/30 shadow-sm" : "border-transparent hover:bg-gray-100 dark:hover:bg-slate-800/60 hover:shadow-sm")}>
                       <div className="relative shrink-0">
                         <Avatar className="h-[52px] w-[52px] shadow-sm">
-                          {u.avatar && <AvatarImage src={u.avatar} alt="Profile" className="object-cover" />}
+                          {u.avatar?.trim() && <AvatarImage src={u.avatar} alt="Profile" className="object-cover" />}
                           <AvatarFallback className="text-gray-800 text-sm font-semibold" style={{ background: pickBg(u.id) }}>{ini(u.name)}</AvatarFallback>
                         </Avatar>
                         {sel && <div className="absolute -bottom-1 -right-1 h-[22px] w-[22px] rounded-full flex items-center justify-center bg-violet-500 border-2 border-white dark:border-slate-800 shadow-sm"><Check className="h-3 w-3 text-white" /></div>}
@@ -351,14 +489,15 @@ export default function Chat() {
                     const isOnline = partner && onlineUsers.has(partner.id);
                     const typing = typingUsers[room.id];
                     const unread = room.unread_count || 0;
+                    const partnerAvatar = partner?.avatar?.trim() ? partner.avatar : null;
 
                     return (
                       <button key={room.id} onClick={() => openRoom(room.id)}
-                        className={cn("w-full flex items-center gap-[14px] p-[12px] rounded-2xl transition-all border group", 
+                        className={cn("w-full flex items-center gap-[14px] p-[12px] rounded-2xl transition-all border group",
                           active ? "bg-white dark:bg-slate-700/80 shadow-md border-white dark:border-slate-600 scale-[1.02]" : "bg-transparent dark:bg-slate-800/30 border-transparent dark:border-white/10 hover:bg-white dark:hover:bg-slate-800/60 hover:shadow-sm hover:scale-[1.01]")}>
                         <div className="relative shrink-0">
                           <Avatar className="h-[52px] w-[52px] shadow-sm">
-                            {partner?.avatar && <AvatarImage src={partner.avatar} alt="Profile" className="object-cover" />}
+                            {partnerAvatar && <AvatarImage src={partnerAvatar} alt="Profile" className="object-cover" />}
                             <AvatarFallback className="text-gray-800 text-sm font-semibold" style={{ background: pickBg(seed) }}>
                               {isGroup ? <Users className="h-5 w-5" /> : ini(name)}
                             </AvatarFallback>
@@ -425,7 +564,7 @@ export default function Chat() {
                 </button>
                 <div className="relative">
                   <Avatar className="h-[46px] w-[46px] shadow-md border-2 border-white dark:border-slate-700">
-                    {activeRoom?.room_type !== 'group' && activeRoom?.participants_details?.find((p: any) => p.id !== user?.id)?.avatar && (
+                    {activeRoom?.room_type !== 'group' && activeRoom?.participants_details?.find((p: any) => p.id !== user?.id)?.avatar?.trim() && (
                       <AvatarImage src={activeRoom.participants_details.find((p: any) => p.id !== user?.id)?.avatar} alt="Profile" className="object-cover" />
                     )}
                     <AvatarFallback className="text-gray-800 text-sm font-semibold" style={{ background: pickBg(activeRoom?.room_type === 'group' ? activeRoom.id : (activeRoom?.participants_details?.find((p: any) => p.id !== user?.id)?.id || activeRoom?.id || '')) }}>
@@ -444,14 +583,24 @@ export default function Chat() {
                   <button className="h-[42px] w-[42px] rounded-full flex items-center justify-center text-gray-500 dark:text-gray-400 hover:text-violet-600 dark:hover:text-violet-400 hover:bg-gray-100 dark:hover:bg-slate-700 transition-all shadow-sm bg-white dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700">
                     <Search className="h-[18px] w-[18px]" />
                   </button>
-                  <button className="h-[42px] w-[42px] rounded-full flex items-center justify-center text-gray-500 dark:text-gray-400 hover:text-violet-600 dark:hover:text-violet-400 hover:bg-gray-100 dark:hover:bg-slate-700 transition-all shadow-sm bg-white dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700">
-                    <MoreVertical className="h-[18px] w-[18px]" />
-                  </button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button className="h-[42px] w-[42px] rounded-full flex items-center justify-center text-gray-500 dark:text-gray-400 hover:text-violet-600 dark:hover:text-violet-400 hover:bg-gray-100 dark:hover:bg-slate-700 transition-all shadow-sm bg-white dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700">
+                        <MoreVertical className="h-[18px] w-[18px]" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700">
+                      <DropdownMenuItem variant="destructive" onClick={deleteChat} className="cursor-pointer">
+                        <Trash2 className="h-4 w-4" />
+                        Delete chat
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
 
               {/* Messages Area */}
-              <div className="flex-1 overflow-y-auto min-h-0 px-[4%] md:px-[6%] py-6 relative z-10 glass-scroll">
+              <div ref={messagesScrollRef} className="flex-1 overflow-y-auto min-h-0 px-[4%] md:px-[6%] py-6 relative z-10 glass-scroll">
                 {messages.length === 0 ? (
                   <div className="flex justify-center mt-6">
                     <span className="text-[13px] font-medium px-4 py-2 rounded-full shadow-sm bg-white dark:bg-slate-800/60 dark:backdrop-blur-md border border-gray-200 dark:border-slate-700 text-gray-500 dark:text-gray-400 flex items-center gap-2">
@@ -464,20 +613,51 @@ export default function Chat() {
                     {messages.map((msg, idx) => {
                       const isMe = msg.sender_id === user?.id;
                       const prev = messages[idx - 1];
-                      const showDate = !prev || new Date(msg.created_at).toDateString() !== new Date(prev.created_at).toDateString();
+                      const showDate = !prev || indianDateKey(new Date(msg.created_at)) !== indianDateKey(new Date(prev.created_at));
                       
                       const stripped = msg.content.replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}\u200d\uFE0F\u20E3\s]/gu, '');
                       const isEmojiOnly = stripped.length === 0 && msg.content.trim().length > 0 && msg.content.trim().length <= 30;
+                      const editable = canEditMessage(msg, user?.id);
+                      const canDelete = isMe || user?.role === 'admin' || user?.role === 'super_admin';
+                      const messageActions = (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button className="h-8 w-8 rounded-full flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity text-gray-400 hover:text-violet-600 hover:bg-white dark:hover:bg-slate-800 shadow-sm border border-transparent hover:border-gray-200 dark:hover:border-slate-700">
+                              <MoreVertical className="h-4 w-4" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align={isMe ? 'end' : 'start'} className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700">
+                            <DropdownMenuItem onClick={() => copyMessage(msg.content)} className="cursor-pointer">
+                              <Copy className="h-4 w-4" />
+                              Copy
+                            </DropdownMenuItem>
+                            {editable && (
+                              <DropdownMenuItem onClick={() => startEditMessage(msg)} className="cursor-pointer">
+                                <Edit3 className="h-4 w-4" />
+                                Edit
+                              </DropdownMenuItem>
+                            )}
+                            {canDelete && (
+                              <DropdownMenuItem variant="destructive" onClick={() => deleteMessage(msg)} className="cursor-pointer">
+                                <Trash2 className="h-4 w-4" />
+                                Delete
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      );
 
                       return (
                         <React.Fragment key={msg.id || idx}>
                           {showDate && <DateBadge date={msg.created_at} />}
-                          <div className={cn("flex group", isMe ? "justify-end" : "justify-start")}>
+                          <div className={cn("flex group items-end gap-2", isMe ? "justify-end" : "justify-start")}>
+                            {isMe && messageActions}
                             {isEmojiOnly ? (
                               <div className="relative px-2 drop-shadow-sm transition-transform hover:scale-110">
                                 <span className="text-[52px] leading-[60px] block">{msg.content}</span>
                                 <span className="flex items-center gap-1 justify-end mt-1">
                                   <span className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm px-1.5 rounded-full">{fmtMsg(msg.created_at)}</span>
+                                  {msg.edited_at && <span className="text-[10px] font-semibold text-gray-400 dark:text-gray-500">edited</span>}
                                 </span>
                               </div>
                             ) : (
@@ -490,11 +670,13 @@ export default function Chat() {
                                   <span className="text-[15px] leading-[22px] whitespace-pre-wrap break-words">{msg.content}</span>
                                   <span className="flex items-center gap-[4px] self-end mt-1 text-[11px] font-medium text-gray-400 dark:text-gray-400">
                                     {fmtMsg(msg.created_at)}
+                                    {msg.edited_at && <span>edited</span>}
                                     {isMe && (msg.is_read ? <CheckCheck className="h-[14px] w-[14px] text-violet-500 dark:text-violet-400" /> : <Check className="h-[14px] w-[14px]" />)}
                                   </span>
                                 </div>
                               </div>
                             )}
+                            {!isMe && messageActions}
                           </div>
                         </React.Fragment>
                       );
@@ -506,6 +688,14 @@ export default function Chat() {
 
               {/* Input area */}
               <div className="px-4 py-4 md:px-6 md:py-6 shrink-0 relative z-20">
+                {editingMsg && (
+                  <div className="max-w-4xl mx-auto mb-2 flex items-center justify-between gap-3 rounded-2xl border border-violet-200 dark:border-violet-500/30 bg-violet-50 dark:bg-violet-950/30 px-4 py-2 text-sm text-violet-700 dark:text-violet-200">
+                    <span className="truncate">Editing message</span>
+                    <button type="button" onClick={cancelEdit} className="h-7 w-7 rounded-full flex items-center justify-center hover:bg-violet-100 dark:hover:bg-violet-900/60">
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
                 <div className="max-w-4xl mx-auto flex items-center gap-3 bg-white dark:bg-slate-800/60 dark:backdrop-blur-2xl border border-gray-200 dark:border-white/10 p-2 rounded-[32px] shadow-sm dark:shadow-[0_8px_30px_rgba(0,0,0,0.06)] relative transition-colors">
                   
                   <div className="relative">
@@ -528,7 +718,7 @@ export default function Chat() {
                   
                   <form onSubmit={sendMessage} className="flex-1 flex items-center gap-2">
                     <input ref={inputRef} value={newMsg} onChange={e => { setNewMsg(e.target.value); handleTyping(); }}
-                      placeholder="Message..." autoComplete="off"
+                      placeholder={editingMsg ? "Edit message..." : "Message..."} autoComplete="off"
                       className="flex-1 min-h-[44px] px-2 text-[15px] font-medium border-0 outline-none bg-transparent text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500" />
                     
                     <button type="submit" disabled={!newMsg.trim()} 

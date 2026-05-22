@@ -8,6 +8,7 @@ from fastapi.responses import RedirectResponse
 from middleware.auth_middleware import get_current_user
 from middleware.rate_limiter import rate_limit
 from models.user import User
+from models.employee import Employee
 from schemas.auth import (
     RegisterRequest,
     LoginRequest,
@@ -231,6 +232,22 @@ async def update_me(
     current_user.updated_at = utc_now()
     await current_user.save()
     
+    # Sync with employee record if it exists
+    employee = await Employee.find_one(Employee.user_id == current_user.id)
+    if employee:
+        employee_updated = False
+        if "first_name" in update_data or "last_name" in update_data:
+            employee.name = f"{current_user.first_name} {current_user.last_name}".strip()
+            employee_updated = True
+        if "email" in update_data:
+            employee.email = current_user.email
+            employee_updated = True
+        if "phone" in update_data:
+            employee.phone = current_user.phone
+            employee_updated = True
+        if employee_updated:
+            await employee.save()
+    
     await log_action(
         str(current_user.org_id) if current_user.org_id else "",
         str(current_user.id),
@@ -268,6 +285,12 @@ async def upload_avatar(
     current_user.avatar_url = avatar_url
     current_user.updated_at = utc_now()
     await current_user.save()
+    
+    # Sync avatar with employee record if it exists
+    employee = await Employee.find_one(Employee.user_id == current_user.id)
+    if employee:
+        employee.avatar_url = avatar_url
+        await employee.save()
     
     await log_action(
         str(current_user.org_id) if current_user.org_id else "",

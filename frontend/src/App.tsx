@@ -161,7 +161,7 @@ function App() {
               </RoleProtectedRoute>
             } />
             <Route path="settings" element={
-              <RoleProtectedRoute roles={['super_admin', 'admin']}>
+              <RoleProtectedRoute roles={['super_admin', 'admin', 'hr', 'employee']}>
                 <Settings />
               </RoleProtectedRoute>
             } />

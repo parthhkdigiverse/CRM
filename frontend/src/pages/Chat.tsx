@@ -88,7 +88,16 @@ export default function Chat() {
     })();
   }, []);
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+  useEffect(() => {
+    if (messages.length) {
+      setTimeout(() => {
+        const glassScroll = document.querySelector('.glass-scroll');
+        if (glassScroll) {
+          glassScroll.scrollTop = glassScroll.scrollHeight;
+        }
+      }, 50);
+    }
+  }, [messages]);
 
   useEffect(() => {
     if (!accessToken) return;

@@ -1,9 +1,9 @@
-import axios from '../axios';
+import { apiClient } from '../axios';
 
 export interface SaleItem {
   product_id: string;
   product_name: string;
-  quantity: int;
+  quantity: number;
   unit_price: number;
   total: number;
 }
@@ -25,16 +25,16 @@ export interface Sale {
 }
 
 export const getSales = async () => {
-  const response = await axios.get('/sales/');
+  const response = await apiClient.get('/sales/');
   return response.data.data;
 };
 
 export const createSale = async (data: Partial<Sale>) => {
-  const response = await axios.post('/sales/', data);
+  const response = await apiClient.post('/sales/', data);
   return response.data;
 };
 
 export const deleteSale = async (id: string) => {
-  const response = await axios.delete(`/sales/${id}`);
+  const response = await apiClient.delete(`/sales/${id}`);
   return response.data;
 };

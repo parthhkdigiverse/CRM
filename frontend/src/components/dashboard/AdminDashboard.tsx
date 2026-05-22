@@ -282,8 +282,8 @@ export default function AdminDashboard() {
                <div className="flex items-center gap-1.5"><div className="h-2 w-2 rounded-full bg-orange-500"></div>Receivables</div>
             </div>
           </CardHeader>
-          <CardContent className="p-6 pt-4 h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
+          <CardContent className="p-6 pt-4 min-h-[300px]">
+            <ResponsiveContainer width="100%" minHeight={250}>
               <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
@@ -319,9 +319,9 @@ export default function AdminDashboard() {
             <CardTitle className="text-lg font-bold">Department Performance</CardTitle>
             <p className="text-xs text-gray-500 mt-1">Contribution share</p>
           </CardHeader>
-          <CardContent className="p-6 pt-0 h-[300px] flex flex-col justify-center">
-            <div className="h-[200px]">
-              <ResponsiveContainer width="100%" height="100%">
+          <CardContent className="p-6 pt-0 min-h-[300px] flex flex-col justify-center">
+            <div className="w-full min-h-[200px]">
+              <ResponsiveContainer width="100%" minHeight={200}>
                 <PieChart>
                   <Pie
                     data={pieData}

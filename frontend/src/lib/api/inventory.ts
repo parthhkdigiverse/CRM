@@ -1,4 +1,4 @@
-import axios from '../axios';
+import { apiClient } from '../axios';
 
 export interface InventoryProduct {
   id: string;
@@ -14,16 +14,16 @@ export interface InventoryProduct {
 }
 
 export const getInventory = async () => {
-  const response = await axios.get('/inventory/');
+  const response = await apiClient.get('/inventory/');
   return response.data.data;
 };
 
 export const createProduct = async (data: Partial<InventoryProduct>) => {
-  const response = await axios.post('/inventory/', data);
+  const response = await apiClient.post('/inventory/', data);
   return response.data;
 };
 
 export const deleteProduct = async (id: string) => {
-  const response = await axios.delete(`/inventory/${id}`);
+  const response = await apiClient.delete(`/inventory/${id}`);
   return response.data;
 };

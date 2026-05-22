@@ -475,6 +475,7 @@ export default function Settings() {
       await apiClient.put('/auth/me', {
         first_name: firstName,
         last_name: lastName,
+        email,
         phone,
         timezone,
       });
@@ -659,8 +660,8 @@ export default function Settings() {
                         <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Email Address</label>
                         <Input 
                           value={email} 
-                          disabled 
-                          className="rounded-xl border-gray-200 dark:border-gray-800 bg-gray-100 dark:bg-gray-900 cursor-not-allowed" 
+                          onChange={(e: any) => setEmail(e.target.value)}
+                          className="rounded-xl border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50" 
                         />
                       </div>
                       <div className="space-y-2">

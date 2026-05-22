@@ -156,16 +156,29 @@ async def get_employee(
     return SuccessResponse(data=d)
 
 
-@router.put("/{employee_id}", response_model=SuccessResponse, dependencies=[Depends(require_roles("admin", "super_admin", "hr"))])
+@router.put("/{employee_id}", response_model=SuccessResponse)
 async def update_employee(
     employee_id: str,
     data: EmployeeUpdate,
-    current_user: User = Depends(require_module_write("employees")),
+    current_user: User = Depends(get_current_user),
     org: Optional[Organization] = Depends(get_current_org)
 ):
     employee = await Employee.find_one(org_filter(org, {"_id": PydanticObjectId(employee_id)}))
     if not employee:
         raise HTTPException(status_code=404, detail="Employee not found")
+
+    is_self = employee.user_id and str(employee.user_id) == str(current_user.id)
+    
+    if current_user.role in ["employee", "hr"]:
+        if current_user.role == "employee" and not is_self:
+            raise HTTPException(status_code=403, detail="You can only edit your own profile")
+            
+        restricted_fields = ["role", "department", "join_date", "salary", "status", "reporting_to"]
+        for field in restricted_fields:
+            if getattr(data, field) is not None:
+                raise HTTPException(status_code=403, detail=f"You are not allowed to modify the {field} field")
+    elif current_user.role not in ["super_admin", "admin"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
         
     update_data = data.model_dump(exclude_unset=True, exclude={"salary"})
     if "reporting_to" in update_data:

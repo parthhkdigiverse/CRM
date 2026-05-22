@@ -410,7 +410,7 @@ export default function Chat() {
           ) : (
             <>
               {/* Chat Header */}
-              <div className="h-[76px] px-6 flex items-center gap-4 shrink-0 relative z-20 border-b border-gray-200 dark:border-white/10 bg-white/90 dark:bg-slate-800/40 backdrop-blur-xl shadow-sm dark:shadow-[0_2px_10px_rgba(0,0,0,0.02)] transition-colors">
+              <div className="h-[76px] px-6 flex items-center gap-4 shrink-0 sticky top-0 w-full z-30 border-b border-gray-200 dark:border-white/10 bg-white/90 dark:bg-slate-800/40 backdrop-blur-xl shadow-sm dark:shadow-[0_2px_10px_rgba(0,0,0,0.02)] transition-colors">
                 <button className="md:hidden p-2 -ml-2 rounded-full bg-gray-100 dark:bg-slate-700/50 hover:bg-gray-200 dark:hover:bg-slate-600 shadow-sm" onClick={() => setMobileShowChat(false)}>
                   <ArrowLeft className="h-5 w-5 text-gray-700 dark:text-gray-300" />
                 </button>

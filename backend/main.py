@@ -18,11 +18,14 @@ from database import init_db, close_db
 from schemas.common import ErrorResponse, ErrorDetail
 from routers import auth, organization, contact, company, lead, deal, invoice, task, employee, ai, attendance, project, meeting, document, audit_log, target, super_admin, payroll, leave, chat
 
-# Setup basic logging
+# Setup basic logging to only show warnings and errors
 logging.basicConfig(
-    level=logging.INFO if settings.APP_ENV == "production" else logging.DEBUG,
+    level=logging.ERROR,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
+# Suppress noisy library logs specifically, just in case
+logging.getLogger("pymongo").setLevel(logging.ERROR)
+logging.getLogger("uvicorn.access").setLevel(logging.ERROR)
 
 
 @asynccontextmanager

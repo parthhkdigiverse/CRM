@@ -16,7 +16,7 @@ import os
 from config import settings
 from database import init_db, close_db
 from schemas.common import ErrorResponse, ErrorDetail
-from routers import auth, organization, contact, company, lead, deal, invoice, task, employee, ai, attendance, project, meeting, document, audit_log, target, super_admin, payroll, leave, chat
+from routers import auth, organization, contact, company, lead, deal, invoice, task, employee, ai, attendance, project, meeting, document, audit_log, target, super_admin, payroll, leave, chat, inventory, sale
 
 # Setup basic logging to only show warnings and errors
 logging.basicConfig(
@@ -126,6 +126,8 @@ app.include_router(super_admin.router)
 app.include_router(payroll.router)
 app.include_router(leave.router)
 app.include_router(chat.router)
+app.include_router(inventory.router)
+app.include_router(sale.router)
 
 
 @app.get("/api/health", tags=["System"])

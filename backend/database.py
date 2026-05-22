@@ -28,6 +28,8 @@ from models.target import Target
 from models.payroll import Payroll
 from models.leave import Leave
 from models.chat import ChatRoom, ChatMessage
+from models.inventory import InventoryProduct
+from models.sale import Sale
 
 _client: AsyncIOMotorClient = None
 
@@ -55,6 +57,8 @@ ALL_MODELS = [
     Leave,
     ChatRoom,
     ChatMessage,
+    InventoryProduct,
+    Sale,
 ]
 
 

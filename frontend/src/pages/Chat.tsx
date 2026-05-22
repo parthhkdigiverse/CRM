@@ -162,7 +162,8 @@ export default function Chat() {
   useEffect(() => {
     if (!accessToken) return;
     const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = import.meta.env.VITE_API_URL ? new URL(import.meta.env.VITE_API_URL).host : 'localhost:8000';
+    const backendPort = import.meta.env.VITE_BACKEND_PORT || '8000';
+    const host = import.meta.env.VITE_API_URL ? new URL(import.meta.env.VITE_API_URL).host : `localhost:${backendPort}`;
     const socket = new WebSocket(`${proto}//${host}/api/v1/chat/ws?token=${accessToken}`);
     socket.onmessage = (e) => {
       const p = JSON.parse(e.data);

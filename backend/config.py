@@ -6,6 +6,15 @@ Loads all environment variables via pydantic-settings.
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+import os
+from dotenv import load_dotenv
+
+# Load root .env
+load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env"))
+
+FRONTEND_PORT = os.getenv("FRONTEND_PORT", "5173")
+BACKEND_PORT = os.getenv("BACKEND_PORT", "8000")
+
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
@@ -28,7 +37,7 @@ class Settings(BaseSettings):
     # Google OAuth
     GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_SECRET: str = ""
-    GOOGLE_REDIRECT_URI: str = "http://localhost:8000/api/v1/auth/google/callback"
+    GOOGLE_REDIRECT_URI: str = f"http://localhost:{BACKEND_PORT}/api/v1/auth/google/callback"
 
     # Claude AI
     ANTHROPIC_API_KEY: str = ""
@@ -45,9 +54,9 @@ class Settings(BaseSettings):
 
     # App
     APP_ENV: str = "development"
-    FRONTEND_URL: str = "http://localhost:5173"
-    BACKEND_URL: str = "http://localhost:8000"
-    ALLOWED_ORIGINS: str = "http://localhost:5173"
+    FRONTEND_URL: str = f"http://localhost:{FRONTEND_PORT}"
+    BACKEND_URL: str = f"http://localhost:{BACKEND_PORT}"
+    ALLOWED_ORIGINS: str = f"http://localhost:{FRONTEND_PORT},http://127.0.0.1:{FRONTEND_PORT},http://localhost:3000,http://127.0.0.1:3000"
 
 
 settings = Settings()

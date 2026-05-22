@@ -82,6 +82,7 @@ async def login(data: LoginRequest, request: Request, response: Response):
                     "first_name": user.first_name,
                     "last_name": user.last_name,
                     "org_id": str(user.org_id) if user.org_id else None,
+                    "avatar_url": user.avatar_url,
                 }
             },
             message="Login successful"

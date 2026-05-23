@@ -18,9 +18,11 @@ from models.contact import Contact
 from models.attendance import Attendance
 from models.employee import Employee
 from models.inventory import InventoryProduct
+from models.expense import Expense
 from schemas.common import SuccessResponse
 
 router = APIRouter(prefix="/api/v1/reports", tags=["Reports"])
+ACTIVE_EXPENSE_STATUSES = {"approved", "paid"}
 
 
 @router.get("/summary", response_model=SuccessResponse)
@@ -55,6 +57,10 @@ async def get_reports_summary(
     payroll_query = {"org_id": org_id_str} if org else {}
     payrolls = await Payroll.find(payroll_query).to_list()
 
+    expense_query = org_filter(org)
+    expenses = await Expense.find(expense_query).to_list()
+    active_expenses = [e for e in expenses if e.status in ACTIVE_EXPENSE_STATUSES]
+
     # Contacts
     contact_query = org_filter(org)
     contacts = await Contact.find(contact_query).to_list()
@@ -73,23 +79,15 @@ async def get_reports_summary(
     inventory_products = await InventoryProduct.find(inventory_query).to_list()
 
     # ── 2. Metric 1: Total Revenue (MoM % growth) ──
-    # Revenue = paid invoices + completed sales
-    overall_revenue = sum(inv.total for inv in invoices if inv.status == "paid") + sum(
-        s.total_amount for s in sales if s.status == "Completed"
-    )
+    # Revenue = completed sales total (which includes synced paid invoices)
+    overall_revenue = sum(s.total_amount for s in sales if s.status == "Completed")
 
     current_month_rev = sum(
-        inv.total for inv in invoices if inv.status == "paid" 
-        and inv.created_at.year == current_year and inv.created_at.month == current_month
-    ) + sum(
         s.total_amount for s in sales if s.status == "Completed"
         and s.sale_date.year == current_year and s.sale_date.month == current_month
     )
 
     last_month_rev = sum(
-        inv.total for inv in invoices if inv.status == "paid" 
-        and inv.created_at.year == last_year and inv.created_at.month == last_month
-    ) + sum(
         s.total_amount for s in sales if s.status == "Completed"
         and s.sale_date.year == last_year and s.sale_date.month == last_month
     )
@@ -172,18 +170,19 @@ async def get_reports_summary(
         dt = datetime(y, m, 1, tzinfo=timezone.utc)
         label = dt.strftime("%b")
         
-        # Monthly Revenue
+        # Monthly Revenue (completed sales includes synced paid invoices)
         m_rev = sum(
-            inv.total for inv in invoices if inv.status == "paid" 
-            and inv.created_at.year == y and inv.created_at.month == m
-        ) + sum(
             s.total_amount for s in sales if s.status == "Completed"
             and s.sale_date.year == y and s.sale_date.month == m
         )
 
-        # Monthly Expense (payroll nets)
+        # Monthly Expense (payroll nets + approved/paid business expenses)
         month_str = f"{y}-{m:02d}"
-        m_exp = sum(p.net_pay for p in payrolls if p.month == month_str)
+        m_exp = sum(p.net_pay for p in payrolls if p.month == month_str) + sum(
+            e.amount
+            for e in active_expenses
+            if e.expense_date.year == y and e.expense_date.month == m
+        )
 
         # Profit
         m_prof = m_rev - m_exp

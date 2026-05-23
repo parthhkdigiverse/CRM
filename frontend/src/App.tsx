@@ -35,6 +35,7 @@ import Payroll from './pages/Payroll';
 import Targets from './pages/Targets';
 import Finance from './pages/Finance';
 import Reports from './pages/Reports';
+import Expenses from './pages/Expenses';
 
 // New Pages
 import AccessDenied from './pages/AccessDenied';
@@ -232,6 +233,11 @@ function App() {
             <Route path="finance" element={
               <RoleProtectedRoute roles={['super_admin', 'admin']}>
                 <Finance />
+              </RoleProtectedRoute>
+            } />
+            <Route path="expenses" element={
+              <RoleProtectedRoute roles={['super_admin', 'admin']}>
+                <Expenses />
               </RoleProtectedRoute>
             } />
             <Route path="reports" element={

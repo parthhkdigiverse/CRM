@@ -38,13 +38,26 @@ interface RecentInvoice {
   due_date: string | null;
 }
 
+interface RecentExpense {
+  id: string;
+  expense_date: string;
+  category: string;
+  amount: number;
+  vendor_name: string | null;
+  status: string;
+  payment_method: string | null;
+}
+
 interface FinanceSummary {
   total_income: number;
   total_expense: number;
   net_profit: number;
   outstanding: number;
+  payroll_expense: number;
+  business_expense: number;
   cash_flow: CashFlowItem[];
   recent_invoices: RecentInvoice[];
+  recent_expenses: RecentExpense[];
 }
 
 const statusColors: Record<string, string> = {
@@ -277,6 +290,7 @@ export default function Finance() {
       </Card>
 
       {/* Recent Invoices */}
+      <div className="grid gap-6 xl:grid-cols-2">
       <Card className="border-0 shadow-sm rounded-2xl bg-white dark:bg-gray-950 overflow-hidden">
         <CardHeader className="p-6 pb-4 flex flex-row items-center justify-between">
           <div>
@@ -341,6 +355,65 @@ export default function Finance() {
           </table>
         </div>
       </Card>
+      <Card className="border-0 shadow-sm rounded-2xl bg-white dark:bg-gray-950 overflow-hidden">
+        <CardHeader className="p-6 pb-4 flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="text-lg font-bold">Recent Expenses</CardTitle>
+            <p className="text-xs text-gray-500 mt-1">
+              Business expenses: {formatINR(data?.business_expense ?? 0)} | Payroll: {formatINR(data?.payroll_expense ?? 0)}
+            </p>
+          </div>
+        </CardHeader>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm text-left text-gray-600 dark:text-gray-400">
+            <thead className="text-[10px] text-gray-500 uppercase bg-gray-50/50 dark:bg-gray-900/50 border-y border-gray-100 dark:border-gray-800">
+              <tr>
+                <th className="px-6 py-4 font-semibold tracking-wider">Category</th>
+                <th className="px-6 py-4 font-semibold tracking-wider">Vendor</th>
+                <th className="px-6 py-4 font-semibold tracking-wider text-right">Amount</th>
+                <th className="px-6 py-4 font-semibold tracking-wider">Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(!data?.recent_expenses || data.recent_expenses.length === 0) ? (
+                <tr>
+                  <td colSpan={4} className="text-center py-16">
+                    <Receipt className="h-12 w-12 text-gray-300 dark:text-gray-600 mb-4 mx-auto" />
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">No expenses yet</h3>
+                    <p className="text-gray-500 max-w-sm mt-1 mx-auto">
+                      Add expenses to include them in cash flow and profit.
+                    </p>
+                  </td>
+                </tr>
+              ) : (
+                data.recent_expenses.map((expense) => (
+                  <tr
+                    key={expense.id}
+                    className="border-b border-gray-50 dark:border-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors"
+                  >
+                    <td className="px-6 py-4 font-semibold text-gray-900 dark:text-white">
+                      {expense.category}
+                    </td>
+                    <td className="px-6 py-4 text-gray-700 dark:text-gray-300">
+                      {expense.vendor_name || expense.payment_method || 'Internal'}
+                    </td>
+                    <td className="px-6 py-4 text-right font-bold text-gray-900 dark:text-white">
+                      {formatINR(expense.amount)}
+                    </td>
+                    <td className="px-6 py-4 text-gray-500">
+                      {new Date(expense.expense_date).toLocaleDateString('en-IN', {
+                        day: 'numeric',
+                        month: 'short',
+                      })}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+      </div>
     </div>
   );
 }

@@ -30,6 +30,7 @@ from models.leave import Leave
 from models.chat import ChatRoom, ChatMessage
 from models.inventory import InventoryProduct
 from models.sale import Sale
+from models.expense import Expense
 
 _client: AsyncIOMotorClient = None
 
@@ -59,6 +60,7 @@ ALL_MODELS = [
     ChatMessage,
     InventoryProduct,
     Sale,
+    Expense,
 ]
 
 

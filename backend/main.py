@@ -17,7 +17,7 @@ from config import settings
 from database import init_db, close_db
 from middleware.security import RequestSecurityMiddleware, SecurityHeadersMiddleware
 from schemas.common import ErrorResponse, ErrorDetail
-from routers import auth, organization, contact, company, lead, deal, invoice, task, employee, ai, attendance, project, meeting, document, audit_log, target, super_admin, payroll, leave, chat, inventory, sale, finance, reports
+from routers import auth, organization, contact, company, lead, deal, invoice, task, employee, ai, attendance, project, meeting, document, audit_log, target, super_admin, payroll, leave, chat, inventory, sale, finance, reports, expense
 from utils.logging import configure_secure_logging, redact
 
 configure_secure_logging(logging.INFO if not settings.is_production else logging.WARNING)
@@ -33,6 +33,22 @@ async def lifespan(app: FastAPI):
     # Startup
     await init_db()
     logging.info("Database connection initialized.")
+    
+    # Sync existing paid invoices to the Sales collection
+    try:
+        from routers.invoice import sync_invoice_to_sale
+        from models.invoice import Invoice
+        logging.info("Checking for unsynced paid invoices...")
+        paid_invoices = await Invoice.find(Invoice.status == "paid", Invoice.is_deleted == False).to_list()
+        count = 0
+        for inv in paid_invoices:
+            await sync_invoice_to_sale(inv)
+            count += 1
+        if count > 0:
+            logging.info(f"Verified/synced {count} existing paid invoices to the Sales collection.")
+    except Exception as e:
+        logging.error(f"Failed to run startup invoice-sales migration: {e}")
+        
     yield
     # Shutdown
     await close_db()
@@ -136,6 +152,7 @@ app.include_router(leave.router)
 app.include_router(chat.router)
 app.include_router(inventory.router)
 app.include_router(sale.router)
+app.include_router(expense.router)
 app.include_router(finance.router)
 app.include_router(reports.router)
 

@@ -24,6 +24,7 @@ class Sale(Document):
     total_amount: float
     
     status: str = Field(default="Completed", description="e.g. Completed, Pending, Cancelled")
+    linked_invoice_id: Optional[str] = None
     
     created_by: str  # User ID of who logged the sale
     created_at: datetime = Field(default_factory=utc_now)

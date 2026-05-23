@@ -45,6 +45,7 @@ async def create_invoice(
     invoice.calculate_totals()
 
     await invoice.insert()
+    await sync_invoice_to_sale(invoice)
     await log_action(str(org.id) if org else "super_admin", str(current_user.id), "create", "invoices", str(invoice.id))
     
     return SuccessResponse(data={"id": str(invoice.id), "invoice_number": inv_number}, message="Invoice created successfully")
@@ -132,6 +133,7 @@ async def update_invoice(
     invoice.updated_by = current_user.id
     invoice.updated_at = utc_now()
     await invoice.save()
+    await sync_invoice_to_sale(invoice)
     
     await log_action(str(org.id) if org else "super_admin", str(current_user.id), "update", "invoices", str(invoice.id))
     
@@ -156,6 +158,7 @@ async def mark_invoice_paid(
     invoice.updated_by = current_user.id
     invoice.updated_at = utc_now()
     await invoice.save()
+    await sync_invoice_to_sale(invoice)
     
     await log_action(str(org.id) if org else "super_admin", str(current_user.id), "update", "invoices", str(invoice.id), changes={"status": "paid"})
     
@@ -176,7 +179,60 @@ async def delete_invoice(
     invoice.deleted_at = utc_now()
     invoice.deleted_by = current_user.id
     await invoice.save()
+    await sync_invoice_to_sale(invoice)
     
     await log_action(str(org.id) if org else "super_admin", str(current_user.id), "delete", "invoices", str(invoice.id))
     
     return SuccessResponse(message="Invoice deleted successfully")
+
+
+async def sync_invoice_to_sale(invoice: Invoice) -> None:
+    """Helper to sync paid invoices to the sales collection."""
+    from models.sale import Sale, SaleItem
+
+    existing_sale = await Sale.find_one(Sale.linked_invoice_id == str(invoice.id))
+
+    if invoice.is_deleted or invoice.status != "paid":
+        if existing_sale:
+            await existing_sale.delete()
+        return
+
+    # Map LineItem to SaleItem
+    sale_items = []
+    for line in invoice.line_items:
+        sale_items.append(
+            SaleItem(
+                product_id="invoice_item",
+                product_name=line.description,
+                quantity=int(line.quantity),
+                unit_price=line.unit_price,
+                total=line.amount
+            )
+        )
+
+    if existing_sale:
+        existing_sale.customer_name = invoice.customer_name or "—"
+        existing_sale.items = sale_items
+        existing_sale.subtotal = invoice.subtotal
+        existing_sale.discount = invoice.discount
+        existing_sale.tax = invoice.tax_amount
+        existing_sale.total_amount = invoice.total
+        existing_sale.sale_date = invoice.payment_date or invoice.created_at
+        existing_sale.updated_at = utc_now()
+        await existing_sale.save()
+    else:
+        new_sale = Sale(
+            org_id=str(invoice.org_id),
+            reference_number=invoice.invoice_number,
+            sale_date=invoice.payment_date or invoice.created_at,
+            customer_name=invoice.customer_name or "—",
+            items=sale_items,
+            subtotal=invoice.subtotal,
+            discount=invoice.discount,
+            tax=invoice.tax_amount,
+            total_amount=invoice.total,
+            status="Completed",
+            linked_invoice_id=str(invoice.id),
+            created_by=str(invoice.created_by)
+        )
+        await new_sale.insert()

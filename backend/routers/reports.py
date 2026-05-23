@@ -134,11 +134,11 @@ async def get_reports_summary(
         )
 
         # Monthly Expense (payroll nets + approved/paid business expenses)
-        month_str = f"{y}-{m:02d}"
-        m_exp = sum(p.net_pay for p in payrolls if p.month == month_str) + sum(
+        month_name_year = dt.strftime("%B %Y")
+        m_exp = sum(p.net_pay for p in payrolls if p.month == month_name_year and p.status == "Paid") + sum(
             e.amount
             for e in active_expenses
-            if e.expense_date.year == y and e.expense_date.month == m
+            if e.expense_date.year == y and e.expense_date.month == m and e.related_type != "payroll"
         )
 
         # Profit

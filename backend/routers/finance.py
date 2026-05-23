@@ -53,8 +53,8 @@ async def get_finance_summary(
     )
 
     # Total Expense = payroll net pay + approved/paid business expenses
-    payroll_expense_total = sum(p.net_pay for p in payrolls)
-    business_expense_total = sum(e.amount for e in active_expenses)
+    payroll_expense_total = sum(p.net_pay for p in payrolls if p.status == "Paid")
+    business_expense_total = sum(e.amount for e in active_expenses if e.related_type != "payroll")
     total_expense = payroll_expense_total + business_expense_total
 
     # Net Profit
@@ -95,12 +95,12 @@ async def get_finance_summary(
         )
         monthly_income.append(round(m_income, 2))
 
-        # Expense for this month (payroll month field is "YYYY-MM" + dated expenses)
-        month_str = f"{year}-{month:02d}"
-        m_expense = sum(p.net_pay for p in payrolls if p.month == month_str) + sum(
+        # Expense for this month (payroll month field is "Month Year" e.g. "May 2026" + dated expenses)
+        month_name_year = dt.strftime("%B %Y")
+        m_expense = sum(p.net_pay for p in payrolls if p.month == month_name_year and p.status == "Paid") + sum(
             e.amount
             for e in active_expenses
-            if e.expense_date.year == year and e.expense_date.month == month
+            if e.expense_date.year == year and e.expense_date.month == month and e.related_type != "payroll"
         )
         monthly_expense.append(round(m_expense, 2))
 

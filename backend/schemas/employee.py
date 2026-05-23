@@ -17,6 +17,7 @@ class EmployeeCreate(BaseModel):
     department: Optional[str] = None
     join_date: Optional[datetime] = None
     salary: Optional[float] = None
+    overtime_rate: Optional[float] = 0.0
     status: str = "active"
     reporting_to: Optional[str] = None
     avatar_url: Optional[str] = None
@@ -34,6 +35,7 @@ class EmployeeUpdate(BaseModel):
     department: Optional[str] = None
     join_date: Optional[datetime] = None
     salary: Optional[float] = None
+    overtime_rate: Optional[float] = None
     status: Optional[str] = None
     reporting_to: Optional[str] = None
     avatar_url: Optional[str] = None
@@ -52,6 +54,7 @@ class EmployeeResponse(BaseModel):
     department: Optional[str] = None
     join_date: Optional[datetime] = None
     salary: Optional[float] = None  # Only populated for admin/super_admin
+    overtime_rate: Optional[float] = None
     status: str
     reporting_to: Optional[str] = None
     avatar_url: Optional[str] = None
@@ -60,3 +63,8 @@ class EmployeeResponse(BaseModel):
     notes: Optional[str] = None
     created_at: datetime
     updated_at: datetime
+
+
+class OvertimeRateUpdate(BaseModel):
+    overtime_rate: float
+

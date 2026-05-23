@@ -15,7 +15,7 @@ class Payroll(Document):
     bonus: float
     deductions: float
     net_pay: float
-    status: Literal['Paid', 'Pending', 'Processing'] = 'Pending'
+    status: Literal['Paid', 'Pending'] = 'Pending'
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 

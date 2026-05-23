@@ -4,7 +4,6 @@ import { apiClient } from '@/lib/axios';
 import { toast } from 'sonner';
 import FormDrawer, { FormField, ChipSelect, inputClass, textareaClass } from '@/components/FormDrawer';
 import MoreDetails from '@/components/MoreDetails';
-
 import {
   Select,
   SelectContent,
@@ -12,11 +11,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useAuthStore } from '@/store/authStore';
 
-interface NewEmployeeDialogProps {
+interface EditEmployeeDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onEmployeeCreated: () => void;
+  employee: any;
+  onEmployeeUpdated: () => void;
 }
 
 const departments = [
@@ -29,11 +30,10 @@ const departments = [
   { value: 'Operations', label: 'Operations' },
 ];
 
-const emptyForm = {
-  name: '', phone: '', email: '', department: 'Sales', role: 'employee', password: '',
-  join_date: new Date().toISOString().split('T')[0],
-  salary: '', overtime_rate: '', manager: '', address: '', skills: '', notes: '',
-};
+const employeeStatuses = [
+  { value: 'active', label: 'Active' },
+  { value: 'inactive', label: 'Inactive' },
+];
 
 interface ManagerOption {
   id: string;
@@ -49,25 +49,58 @@ const unwrapList = <T,>(payload: any): T[] => {
   return [];
 };
 
-export default function NewEmployeeDialog({ open, onOpenChange, onEmployeeCreated }: NewEmployeeDialogProps) {
-
+export default function EditEmployeeDialog({ open, onOpenChange, employee, onEmployeeUpdated }: EditEmployeeDialogProps) {
+  const { user } = useAuthStore();
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
   const [loading, setLoading] = useState(false);
   const [managersLoading, setManagersLoading] = useState(false);
   const [managerOptions, setManagerOptions] = useState<ManagerOption[]>([]);
-  const [form, setForm] = useState({ ...emptyForm });
-  const [globalRate, setGlobalRate] = useState<number | null>(null);
+  const [form, setForm] = useState({
+    name: '',
+    phone: '',
+    email: '',
+    department: 'Sales',
+    role: 'employee',
+    join_date: '',
+    salary: '',
+    manager: '',
+    address: '',
+    skills: '',
+    notes: '',
+    status: 'active'
+  });
 
   const u = (field: string, value: string) => setForm((p) => ({ ...p, [field]: value }));
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || !employee) return;
+
+    // Populate form fields
+    setForm({
+      name: employee.name || '',
+      phone: employee.phone || '',
+      email: employee.email || '',
+      department: employee.department || 'Sales',
+      role: employee.role || 'employee',
+      join_date: employee.join_date ? employee.join_date.split('T')[0] : '',
+      salary: employee.salary !== null && employee.salary !== undefined ? String(employee.salary) : '',
+      manager: employee.reporting_to || '',
+      address: employee.address || '',
+      skills: employee.skills || '',
+      notes: employee.notes || '',
+      status: employee.status || 'active'
+    });
 
     let cancelled = false;
     const fetchManagers = async () => {
       setManagersLoading(true);
       try {
         const res = await apiClient.get('/employees/managers');
-        if (!cancelled) setManagerOptions(unwrapList<ManagerOption>(res.data));
+        if (!cancelled) {
+          // Filter out the current employee from the manager list to prevent circular hierarchy
+          const list = unwrapList<ManagerOption>(res.data).filter(m => m.id !== employee.id);
+          setManagerOptions(list);
+        }
       } catch {
         if (!cancelled) setManagerOptions([]);
       } finally {
@@ -75,54 +108,45 @@ export default function NewEmployeeDialog({ open, onOpenChange, onEmployeeCreate
       }
     };
 
-    const fetchGlobalRate = async () => {
-      try {
-        const res = await apiClient.get('/employees/overtime-rate');
-        if (!cancelled) setGlobalRate(res.data.overtime_rate);
-      } catch {
-        if (!cancelled) setGlobalRate(0);
-      }
-    };
-
     fetchManagers();
-    fetchGlobalRate();
     return () => {
       cancelled = true;
     };
-  }, [open]);
+  }, [open, employee]);
 
   const submit = async (): Promise<boolean> => {
-    if (loading) return false;
+    if (loading || !employee) return false;
     if (!form.name.trim()) { toast.error('Employee Name is required'); return false; }
     if (!form.email.trim()) { toast.error('Email address is required'); return false; }
-    if (!form.password.trim()) { toast.error('Password is required to create a user account'); return false; }
 
     setLoading(true);
     try {
       const payload: Record<string, any> = {
         name: form.name.trim(),
         email: form.email.trim(),
-        password: form.password.trim(),
         role: form.role,
         department: form.department,
-        status: 'active',
+        status: form.status,
         join_date: form.join_date ? new Date(form.join_date).toISOString() : new Date().toISOString(),
       };
-      if (form.phone.trim()) payload.phone = form.phone.trim();
-      if (form.manager) payload.reporting_to = form.manager;
-      if (form.address.trim()) payload.address = form.address.trim();
-      if (form.skills.trim()) payload.skills = form.skills.trim();
-      if (form.notes.trim()) payload.notes = form.notes.trim();
-      const salaryFloat = parseFloat(form.salary);
-      if (!isNaN(salaryFloat)) payload.salary = salaryFloat;
-      const otFloat = parseFloat(form.overtime_rate);
-      if (!isNaN(otFloat)) payload.overtime_rate = otFloat;
+      
+      payload.phone = form.phone.trim();
+      payload.reporting_to = form.manager || null;
+      payload.address = form.address.trim();
+      payload.skills = form.skills.trim();
+      payload.notes = form.notes.trim();
 
-      await apiClient.post('/employees', payload);
-      toast.success('Employee and user account created successfully!');
+      // Only allow editing salary if Admin/SuperAdmin
+      if (isAdmin) {
+        const salaryFloat = parseFloat(form.salary);
+        payload.salary = !isNaN(salaryFloat) ? salaryFloat : null;
+      }
+
+      await apiClient.put(`/employees/${employee.id}`, payload);
+      toast.success('Employee profile updated successfully!');
       return true;
     } catch (err: any) {
-      toast.error(err?.response?.data?.detail || 'Failed to add employee');
+      toast.error(err?.response?.data?.detail || 'Failed to update employee details');
       return false;
     } finally {
       setLoading(false);
@@ -131,22 +155,16 @@ export default function NewEmployeeDialog({ open, onOpenChange, onEmployeeCreate
 
   const handleSave = async () => {
     const ok = await submit();
-    if (ok) { setForm({ ...emptyForm }); onOpenChange(false); onEmployeeCreated(); }
-  };
-
-  const handleSaveAndNew = async () => {
-    const ok = await submit();
-    if (ok) { setForm({ ...emptyForm }); onEmployeeCreated(); toast.info('Form cleared — add another employee'); }
+    if (ok) { onOpenChange(false); onEmployeeUpdated(); }
   };
 
   return (
     <FormDrawer
       open={open}
       onClose={() => !loading && onOpenChange(false)}
-      title="Add New Employee"
-      subtitle="Add a team member to your organization."
+      title="Edit Employee Profile"
+      subtitle={`Modify information for ${employee?.name || 'team member'}`}
       onSave={handleSave}
-      onSaveAndNew={handleSaveAndNew}
       loading={loading}
     >
       {/* Visible Fields */}
@@ -162,33 +180,49 @@ export default function NewEmployeeDialog({ open, onOpenChange, onEmployeeCreate
         <Input type="email" value={form.email} onChange={(e) => u('email', e.target.value)} placeholder="priya@company.com" className={inputClass} />
       </FormField>
 
-      <FormField label="Password" required>
-        <Input type="password" value={form.password} onChange={(e) => u('password', e.target.value)} placeholder="••••••••" className={inputClass} />
-      </FormField>
-
-      <FormField label="System Role" required>
+      <FormField label="Status" required>
         <ChipSelect
-          options={[
-            { value: 'employee', label: 'Employee' },
-            { value: 'hr', label: 'HR' }
-          ]}
-          value={form.role}
-          onChange={(v) => u('role', v)}
+          options={employeeStatuses}
+          value={form.status}
+          onChange={(v) => u('status', v)}
         />
       </FormField>
 
+      <FormField label="System Role" required>
+        {isAdmin ? (
+          <ChipSelect
+            options={[
+              { value: 'employee', label: 'Employee' },
+              { value: 'hr', label: 'HR' }
+            ]}
+            value={form.role}
+            onChange={(v) => u('role', v)}
+          />
+        ) : (
+          <div className="py-2 px-3 bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-800 rounded-xl text-sm font-semibold capitalize text-gray-700 dark:text-gray-300">
+            {form.role}
+          </div>
+        )}
+      </FormField>
+
       <FormField label="Department">
-        <ChipSelect options={departments} value={form.department} onChange={(v) => u('department', v)} />
+        {isAdmin ? (
+          <ChipSelect options={departments} value={form.department} onChange={(v) => u('department', v)} />
+        ) : (
+          <div className="py-2 px-3 bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-800 rounded-xl text-sm font-semibold text-gray-700 dark:text-gray-300">
+            {form.department}
+          </div>
+        )}
       </FormField>
 
       <FormField label="Joining Date">
-        <Input type="date" value={form.join_date} onChange={(e) => u('join_date', e.target.value)} className={inputClass} />
+        <Input type="date" value={form.join_date} onChange={(e) => u('join_date', e.target.value)} className={inputClass} disabled={!isAdmin} />
       </FormField>
 
       {/* More Details */}
       <MoreDetails>
         <FormField label="Manager">
-          <Select value={form.manager || 'none'} onValueChange={(value) => u('manager', value === 'none' ? '' : value)}>
+          <Select value={form.manager || 'none'} onValueChange={(value) => u('manager', value === 'none' ? '' : value)} disabled={!isAdmin}>
             <SelectTrigger className="w-full rounded-xl border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50 h-9 text-sm">
               <SelectValue placeholder={managersLoading ? 'Loading HR managers...' : 'Select HR manager'} />
             </SelectTrigger>
@@ -202,17 +236,18 @@ export default function NewEmployeeDialog({ open, onOpenChange, onEmployeeCreate
             </SelectContent>
           </Select>
         </FormField>
+        
         <FormField label="Monthly Salary (₹)">
-          <Input type="number" value={form.salary} onChange={(e) => u('salary', e.target.value)} placeholder="75000" className={inputClass} />
+          <Input 
+            type="number" 
+            value={form.salary} 
+            onChange={(e) => u('salary', e.target.value)} 
+            placeholder={isAdmin ? "75000" : "Encrypted (Admin only)"} 
+            className={inputClass} 
+            disabled={!isAdmin} 
+          />
         </FormField>
-        <FormField label="Overtime Rate">
-          <div className="p-3 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-xl text-xs text-gray-500 font-semibold flex items-center justify-between">
-            <span>Global Overtime Rate:</span>
-            <span className="font-extrabold text-purple-600 dark:text-purple-400">
-              {globalRate !== null ? `₹${globalRate} / hour` : 'Loading...'}
-            </span>
-          </div>
-        </FormField>
+
         <FormField label="Address">
           <textarea value={form.address} onChange={(e) => u('address', e.target.value)} placeholder="Full address..." rows={2} className={textareaClass} />
         </FormField>

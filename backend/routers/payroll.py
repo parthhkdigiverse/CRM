@@ -1,4 +1,5 @@
 from typing import Optional
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, Query, HTTPException
 from beanie import PydanticObjectId
 import random
@@ -109,7 +110,17 @@ async def generate_payroll(
         leaves = random.randint(0, 2)
         worked_days = working_days - leaves
         deductions = (basic / working_days) * leaves
-        net_pay = basic - deductions
+        
+        # Calculate overtime pay for this employee and month
+        from models.overtime import Overtime
+        overtimes = await Overtime.find({
+            "employee_id": str(emp.id),
+            "month": month,
+            "org_id": str(org.id) if org else ""
+        }).to_list()
+        overtime_pay = sum(o.amount for o in overtimes)
+        
+        net_pay = basic + overtime_pay - deductions
         
         p = Payroll(
             employee_id=str(emp.id),
@@ -119,7 +130,7 @@ async def generate_payroll(
             worked_days=worked_days,
             leaves=leaves,
             basic=basic,
-            bonus=0.0,
+            bonus=overtime_pay,
             deductions=deductions,
             net_pay=net_pay,
             status="Pending"
@@ -153,6 +164,50 @@ async def update_payroll(
         
     await payroll.save()
     
+    # Sync status and net_pay to Expenses collection
+    if payroll.status == "Paid":
+        emp = None
+        try:
+            emp = await Employee.get(PydanticObjectId(payroll.employee_id))
+        except Exception:
+            pass
+        emp_name = emp.name if emp else "Unknown Employee"
+        
+        from models.expense import Expense
+        existing_exp = await Expense.find_one({
+            "related_type": "payroll",
+            "related_id": str(payroll.id),
+            "is_deleted": False
+        })
+        if existing_exp:
+            existing_exp.amount = payroll.net_pay
+            existing_exp.description = f"Salary for {emp_name} - {payroll.month}"
+            existing_exp.updated_at = datetime.now(timezone.utc)
+            await existing_exp.save()
+        else:
+            expense = Expense(
+                org_id=parse_object_id(payroll.org_id, "org_id"),
+                expense_date=datetime.now(timezone.utc),
+                category="Salaries",
+                amount=payroll.net_pay,
+                currency="INR",
+                payment_method="Bank Transfer",
+                status="paid",
+                related_type="payroll",
+                related_id=str(payroll.id),
+                description=f"Salary for {emp_name} - {payroll.month}",
+                created_by=current_user.id
+            )
+            await expense.insert()
+    elif payroll.status == "Pending":
+        from models.expense import Expense
+        linked_expenses = await Expense.find({
+            "related_type": "payroll",
+            "related_id": str(payroll.id)
+        }).to_list()
+        for exp in linked_expenses:
+            await exp.delete()
+            
     await log_action(str(org.id) if org else None, str(current_user.id), "update", "payroll", str(payroll.id), changes=update_data)
     
     return SuccessResponse(message="Payroll updated successfully")

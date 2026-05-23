@@ -21,6 +21,7 @@ class Employee(Document):
     department: Optional[str] = None
     join_date: Optional[datetime] = None
     salary_encrypted: Optional[str] = None  # Encrypted via Fernet
+    overtime_rate: float = 0.0
     status: str = "active"  # active, inactive
     reporting_to: Optional[PydanticObjectId] = None
     avatar_url: Optional[str] = None

@@ -32,6 +32,14 @@ from utils.helpers import utc_now
 logger = logging.getLogger(__name__)
 
 
+def _make_aware(dt: Optional[datetime]) -> Optional[datetime]:
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
 async def register_user(data: RegisterRequest) -> User:
     """Register a new user with email verification."""
     # Validate password strength
@@ -84,7 +92,7 @@ async def verify_email(email: str, otp: str) -> bool:
     if not user.email_verification_otp or user.email_verification_otp != otp:
         raise ValueError("Invalid OTP")
 
-    if user.otp_expires_at and user.otp_expires_at < utc_now():
+    if user.otp_expires_at and _make_aware(user.otp_expires_at) < utc_now():
         raise ValueError("OTP has expired")
 
     user.is_email_verified = True
@@ -115,8 +123,8 @@ async def login_user(
         raise ValueError("Account is deactivated. Contact your administrator.")
 
     # Check lockout
-    if user.locked_until and user.locked_until > utc_now():
-        remaining = (user.locked_until - utc_now()).seconds // 60
+    if user.locked_until and _make_aware(user.locked_until) > utc_now():
+        remaining = (_make_aware(user.locked_until) - utc_now()).seconds // 60
         raise ValueError(f"Account is locked. Try again in {remaining + 1} minutes.")
 
     # Verify password

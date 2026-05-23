@@ -41,7 +41,7 @@ interface PayrollEntry {
   bonus: number;
   deductions: number;
   netPay: number;
-  status: 'Paid' | 'Pending' | 'Processing';
+  status: 'Paid' | 'Pending';
 }
 
 export default function Payroll() {
@@ -52,6 +52,7 @@ export default function Payroll() {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [updatingIds, setUpdatingIds] = useState<Record<string, boolean>>({});
   
   const [editOpen, setEditOpen] = useState(false);
   const [selectedPayroll, setSelectedPayroll] = useState<PayrollEntry | null>(null);
@@ -102,6 +103,20 @@ export default function Payroll() {
       toast.error(err.response?.data?.detail || 'Failed to generate payroll');
     } finally {
       setGenerating(false);
+    }
+  };
+
+  const handleUpdateStatus = async (payrollId: string, newStatus: 'Paid' | 'Pending') => {
+    try {
+      setUpdatingIds((prev) => ({ ...prev, [payrollId]: true }));
+      await apiClient.put(`/payroll/${payrollId}`, { status: newStatus });
+      toast.success(`Payroll status updated to ${newStatus}`);
+      await fetchPayrolls();
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.response?.data?.detail || 'Failed to update payroll status');
+    } finally {
+      setUpdatingIds((prev) => ({ ...prev, [payrollId]: false }));
     }
   };
 
@@ -310,7 +325,40 @@ export default function Payroll() {
                         </span>
                       </td>
                       <td className="py-3 px-3 text-center">
-                        <div className="flex items-center justify-center gap-1">
+                        <div className="flex items-center justify-center gap-2">
+                          {!isEmployee && (
+                            <>
+                              {entry.status !== 'Paid' && (
+                                <button
+                                  onClick={() => handleUpdateStatus(entry.id, 'Pending')}
+                                  disabled={entry.status === 'Pending' || updatingIds[entry.id]}
+                                  className={cn(
+                                    "px-2.5 py-1 text-xs font-semibold rounded-lg transition-all",
+                                    entry.status === 'Pending'
+                                      ? "bg-amber-500 text-white shadow-sm cursor-default"
+                                      : "bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/40",
+                                    updatingIds[entry.id] && "opacity-50 cursor-not-allowed"
+                                  )}
+                                >
+                                  Pending
+                                </button>
+                              )}
+                              <button
+                                onClick={() => handleUpdateStatus(entry.id, 'Paid')}
+                                disabled={entry.status === 'Paid' || updatingIds[entry.id]}
+                                className={cn(
+                                  "px-2.5 py-1 text-xs font-semibold rounded-lg transition-all",
+                                  entry.status === 'Paid'
+                                    ? "bg-emerald-600 text-white shadow-sm cursor-default"
+                                    : "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/40",
+                                  updatingIds[entry.id] && "opacity-50 cursor-not-allowed"
+                                )}
+                              >
+                                Paid
+                              </button>
+                              <div className="h-4 w-[1px] bg-gray-200 dark:bg-gray-800 mx-1" />
+                            </>
+                          )}
                           {!isEmployee && (
                             <Button
                               variant="ghost"

@@ -9,4 +9,4 @@ class PayrollUpdate(BaseModel):
     bonus: Optional[float] = None
     deductions: Optional[float] = None
     net_pay: Optional[float] = None
-    status: Optional[Literal['Paid', 'Pending', 'Processing']] = None
+    status: Optional[Literal['Paid', 'Pending']] = None

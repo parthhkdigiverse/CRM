@@ -159,7 +159,6 @@ export default function EditPayrollDialog({ open, onOpenChange, payroll, onUpdat
                   className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all outline-none text-sm"
                 >
                   <option value="Pending">Pending</option>
-                  <option value="Processing">Processing</option>
                   <option value="Paid">Paid</option>
                 </select>
               </div>

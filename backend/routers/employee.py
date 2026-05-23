@@ -11,7 +11,7 @@ from middleware.rbac import require_module_read, require_module_write, require_m
 from models.user import User
 from models.organization import Organization
 from models.employee import Employee
-from schemas.employee import EmployeeCreate, EmployeeUpdate, EmployeeResponse
+from schemas.employee import EmployeeCreate, EmployeeUpdate, EmployeeResponse, OvertimeRateUpdate
 from schemas.common import SuccessResponse, PaginatedResponse
 from utils.helpers import paginate_params, build_paginated_response, build_sort_params, utc_now, parse_object_id, escape_regex
 from utils.security import encrypt_field, decrypt_field, hash_password
@@ -58,6 +58,16 @@ async def create_employee(
 ):
     if not org and current_user.role != "super_admin":
         raise HTTPException(status_code=403, detail="Organization context is required")
+
+    # Fetch and apply the global overtime rate
+    global_rate = 0.0
+    if org:
+        global_rate = org.settings.get("overtime_rate", 0.0)
+    else:
+        first_emp = await Employee.find_one({"is_deleted": {"$ne": True}})
+        if first_emp:
+            global_rate = first_emp.overtime_rate
+    data.overtime_rate = global_rate
 
     resolved_reporting_to = await resolve_employee_reference(data.reporting_to, org, "Reporting manager")
     resolved_user_id = parse_object_id(data.user_id, "user_id") if data.user_id else None
@@ -211,6 +221,46 @@ async def list_manager_options(
     )
 
 
+@router.get("/overtime-rate", response_model=dict)
+async def get_global_overtime_rate(
+    org: Optional[Organization] = Depends(get_current_org)
+):
+    if org:
+        rate = org.settings.get("overtime_rate", 0.0)
+    else:
+        first_emp = await Employee.find_one({"is_deleted": {"$ne": True}})
+        rate = first_emp.overtime_rate if first_emp else 0.0
+    return {"overtime_rate": rate}
+
+
+@router.post("/overtime-rate", response_model=SuccessResponse, dependencies=[Depends(require_roles("admin", "super_admin"))])
+async def update_global_overtime_rate(
+    data: OvertimeRateUpdate,
+    current_user: User = Depends(require_module_write("employees")),
+    org: Optional[Organization] = Depends(get_current_org)
+):
+    if org:
+        if not org.settings:
+            org.settings = {}
+        org.settings["overtime_rate"] = data.overtime_rate
+        await org.save()
+
+    # Bulk update all employees' overtime_rate
+    await Employee.find(org_filter(org, {"is_deleted": {"$ne": True}})).update(
+        {"$set": {"overtime_rate": data.overtime_rate}}
+    )
+
+    await log_action(
+        str(org.id) if org else "super_admin",
+        str(current_user.id),
+        "update_global_overtime_rate",
+        "settings",
+        str(org.id) if org else "global"
+    )
+
+    return SuccessResponse(message="Global overtime rate updated for all employees")
+
+
 @router.get("/{employee_id}", response_model=SuccessResponse)
 async def get_employee(
     employee_id: str,
@@ -254,7 +304,7 @@ async def update_employee(
         if current_user.role == "employee" and not is_self:
             raise HTTPException(status_code=403, detail="You can only edit your own profile")
             
-        restricted_fields = ["role", "department", "join_date", "salary", "status", "reporting_to"]
+        restricted_fields = ["role", "department", "join_date", "salary", "status", "reporting_to", "overtime_rate"]
         for field in restricted_fields:
             if getattr(data, field) is not None:
                 raise HTTPException(status_code=403, detail=f"You are not allowed to modify the {field} field")
@@ -309,3 +359,4 @@ async def delete_employee(
     await log_action(str(org.id) if org else "super_admin", str(current_user.id), "delete", "employees", str(employee.id))
     
     return SuccessResponse(message="Employee deleted successfully")
+

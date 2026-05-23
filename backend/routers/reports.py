@@ -14,10 +14,8 @@ from models.organization import Organization
 from models.invoice import Invoice
 from models.sale import Sale
 from models.payroll import Payroll
-from models.contact import Contact
-from models.attendance import Attendance
-from models.employee import Employee
 from models.inventory import InventoryProduct
+from models.contact import Contact
 from models.expense import Expense
 from schemas.common import SuccessResponse
 
@@ -65,14 +63,7 @@ async def get_reports_summary(
     contact_query = org_filter(org)
     contacts = await Contact.find(contact_query).to_list()
 
-    # Employees
-    employee_query = org_filter(org)
-    employees = await Employee.find(employee_query).to_list()
-    employee_map = {emp.id: emp for emp in employees}
 
-    # Attendance
-    attendance_query = org_filter(org)
-    attendances = await Attendance.find(attendance_query).to_list()
 
     # Inventory Products
     inventory_query = {"org_id": org_id_str} if org else {}
@@ -113,41 +104,7 @@ async def get_reports_summary(
     else:
         customer_change = 4.3 if total_active_customers > 0 else 0.0 # Fallback growth matching mockup
 
-    # ── 4. Metric 3: Average Productivity (MoM % growth) ──
-    # Calculate daily work hours from attendance logs (check_out - check_in)
-    def calc_attendance_hours(att_list: List[Attendance]) -> List[float]:
-        hours = []
-        for att in att_list:
-            if att.check_in and att.check_out:
-                diff = (att.check_out - att.check_in).total_seconds() / 3600.0
-                if 0 < diff < 24: # Sanity check
-                    hours.append(diff)
-        return hours
 
-    all_att_hours = calc_attendance_hours(attendances)
-    overall_avg_productivity = sum(all_att_hours) / len(all_att_hours) if all_att_hours else 7.6 # Default 7.6h matching mockup
-
-    # Group by month for current vs last month
-    curr_month_att = [
-        att for att in attendances 
-        if att.date.startswith(f"{current_year}-{current_month:02d}")
-    ]
-    last_month_att = [
-        att for att in attendances 
-        # Pad month string
-        if att.date.startswith(f"{last_year}-{last_month:02d}")
-    ]
-
-    curr_hours = calc_attendance_hours(curr_month_att)
-    last_hours = calc_attendance_hours(last_month_att)
-
-    curr_avg = sum(curr_hours) / len(curr_hours) if curr_hours else overall_avg_productivity
-    last_avg = sum(last_hours) / len(last_hours) if last_hours else 7.4 # Baseline 7.4h
-
-    if last_avg > 0:
-        productivity_change = ((curr_avg - last_avg) / last_avg) * 100
-    else:
-        productivity_change = 2.1 # Fallback matching mockup
 
     # ── 5. Metric 4: Stock Turnover ──
     # Stock Turnover = (Total Completed Sales Value) / (Total Inventory Product Value)
@@ -217,72 +174,7 @@ async def get_reports_summary(
             "cancelled": round(cancelled_val, 2),
         })
 
-    # ── 8. Tab 3: Department Chart Data ──
-    # Group attendance check_ins by employee department
-    dept_hours = defaultdict(list)
-    for att in attendances:
-        if att.check_in and att.check_out:
-            emp = employee_map.get(att.employee_id)
-            if emp and emp.department:
-                diff = (att.check_out - att.check_in).total_seconds() / 3600.0
-                if 0 < diff < 24:
-                    dept_hours[emp.department].append(diff)
-    
-    # Defaults in case of missing data to make chart look rich and represent mock departments
-    default_depts = {
-        "Engineering": 7.8,
-        "Sales": 7.5,
-        "Marketing": 7.2,
-        "HR": 7.0,
-        "Management": 8.0,
-    }
-
-    department_data = []
-    all_depts = set(default_depts.keys()) | set(dept_hours.keys())
-    for dept in sorted(all_depts):
-        hours_list = dept_hours.get(dept, [])
-        avg_h = sum(hours_list) / len(hours_list) if hours_list else default_depts.get(dept, 7.5)
-        department_data.append({
-            "department": dept,
-            "productivity": round(avg_h, 1)
-        })
-
-    # ── 9. Tab 4: Productivity (Inventory levels vs min stock by category) ──
-    cat_stock = defaultdict(int)
-    cat_min = defaultdict(int)
-    cat_val = defaultdict(float)
-
-    for p in inventory_products:
-        cat_stock[p.category] += p.stock_quantity
-        cat_min[p.category] += p.min_stock_level
-        cat_val[p.category] += p.unit_price * p.stock_quantity
-
-    default_cats = {
-        "Electronics": (120, 30, 24500.0),
-        "Office Supplies": (450, 100, 8900.0),
-        "Furniture": (45, 15, 35000.0),
-        "Software Licences": (80, 20, 18000.0),
-    }
-
-    productivity_data = []
-    all_cats = set(default_cats.keys()) | set(cat_stock.keys())
-    for cat in sorted(all_cats):
-        stock = cat_stock.get(cat, 0)
-        min_lvl = cat_min.get(cat, 0)
-        val = cat_val.get(cat, 0.0)
-
-        # Use mock defaults if no data exists
-        if stock == 0 and cat in default_cats:
-            stock, min_lvl, val = default_cats[cat]
-
-        productivity_data.append({
-            "category": cat,
-            "stock_level": stock,
-            "min_stock_level": min_lvl,
-            "valuation": round(val, 2)
-        })
-
-    # ── 10. Respond with aggregates ──
+    # ── 8. Respond with aggregates ──
     return SuccessResponse(
         data={
             "metrics": {
@@ -290,13 +182,9 @@ async def get_reports_summary(
                 "revenue_change": round(revenue_change, 1),
                 "active_customers": total_active_customers,
                 "customer_change": round(customer_change, 1),
-                "avg_productivity": round(overall_avg_productivity, 1),
-                "productivity_change": round(productivity_change, 1),
                 "stock_turnover": round(stock_turnover, 1),
             },
             "financial": financial_data,
             "sales": sales_data,
-            "department": department_data,
-            "productivity": productivity_data,
         }
     )

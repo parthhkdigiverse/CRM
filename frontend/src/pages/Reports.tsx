@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import {
   TrendingUp,
   Users,
-  Activity,
   Package,
   RefreshCcw,
   Loader2,
@@ -31,8 +30,6 @@ interface MetricGroup {
   revenue_change: number;
   active_customers: number;
   customer_change: number;
-  avg_productivity: number;
-  productivity_change: number;
   stock_turnover: number;
 }
 
@@ -50,30 +47,16 @@ interface SalesData {
   cancelled: number;
 }
 
-interface DepartmentData {
-  department: string;
-  productivity: number;
-}
-
-interface ProductivityData {
-  category: string;
-  stock_level: number;
-  min_stock_level: number;
-  valuation: number;
-}
-
 interface ReportsSummary {
   metrics: MetricGroup;
   financial: FinancialData[];
   sales: SalesData[];
-  department: DepartmentData[];
-  productivity: ProductivityData[];
 }
 
 export default function Reports() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<ReportsSummary | null>(null);
-  const [activeTab, setActiveTab] = useState<'financial' | 'sales' | 'department' | 'productivity'>('financial');
+  const [activeTab, setActiveTab] = useState<'financial' | 'sales'>('financial');
 
   const fetchData = useCallback(async () => {
     try {
@@ -141,35 +124,7 @@ export default function Reports() {
     return null;
   };
 
-  const DeptTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-3 shadow-xl">
-          <p className="text-sm font-bold text-gray-900 dark:text-white mb-1">{label}</p>
-          <p className="text-xs font-semibold text-purple-600 dark:text-purple-400">
-            Avg Daily Hours: {payload[0].value} h
-          </p>
-        </div>
-      );
-    }
-    return null;
-  };
 
-  const ProdTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-3 shadow-xl">
-          <p className="text-sm font-bold text-gray-900 dark:text-white mb-1.5">{label}</p>
-          {payload.map((entry: any, index: number) => (
-            <p key={index} className="text-xs font-semibold" style={{ color: entry.fill || entry.color }}>
-              {entry.name}: {entry.name === 'Valuation' ? formatINR(entry.value) : `${entry.value} items`}
-            </p>
-          ))}
-        </div>
-      );
-    }
-    return null;
-  };
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-8 print:p-4">
@@ -177,7 +132,7 @@ export default function Reports() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 print:hidden">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">Reports & Analytics</h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">Department, sales, financial and productivity insights.</p>
+          <p className="text-gray-500 dark:text-gray-400 mt-1">Sales and financial insights.</p>
         </div>
         <div className="flex items-center gap-3">
           <Button
@@ -206,8 +161,8 @@ export default function Reports() {
         </p>
       </div>
 
-      {/* 4 Metric Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      {/* 3 Metric Cards */}
+      <div className="grid gap-4 md:grid-cols-3">
         {/* Total Revenue */}
         <Card className="relative overflow-hidden border-0 shadow-sm rounded-2xl bg-white dark:bg-gray-950 hover:shadow-md transition-shadow">
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 to-indigo-600" />
@@ -248,28 +203,6 @@ export default function Reports() {
             </div>
             <div className="h-11 w-11 rounded-xl bg-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-500/20 text-white">
               <Users className="h-5 w-5" />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Avg Productivity */}
-        <Card className="relative overflow-hidden border-0 shadow-sm rounded-2xl bg-white dark:bg-gray-950 hover:shadow-md transition-shadow">
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-indigo-600" />
-          <CardContent className="p-5 flex justify-between items-start">
-            <div className="space-y-1">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400">
-                Avg Productivity
-              </p>
-              <div className="text-3xl font-extrabold text-gray-900 dark:text-white">
-                {metricsData?.avg_productivity ?? 7.6} h
-              </div>
-              <p className="text-xs flex items-center font-medium text-emerald-600 dark:text-emerald-400 mt-1">
-                <TrendingUp className="h-3 w-3 mr-1" />
-                +{metricsData?.productivity_change ?? 2.1}% vs last month
-              </p>
-            </div>
-            <div className="h-11 w-11 rounded-xl bg-blue-500 flex items-center justify-center shadow-lg shadow-blue-500/20 text-white">
-              <Activity className="h-5 w-5" />
             </div>
           </CardContent>
         </Card>
@@ -317,26 +250,6 @@ export default function Reports() {
           onClick={() => setActiveTab('sales')}
         >
           Sales
-        </button>
-        <button
-          className={`py-3 px-6 font-bold text-sm border-b-2 transition-colors duration-200 whitespace-nowrap ${
-            activeTab === 'department'
-              ? 'border-purple-600 text-purple-600 dark:text-purple-400'
-              : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-          }`}
-          onClick={() => setActiveTab('department')}
-        >
-          Department
-        </button>
-        <button
-          className={`py-3 px-6 font-bold text-sm border-b-2 transition-colors duration-200 whitespace-nowrap ${
-            activeTab === 'productivity'
-              ? 'border-purple-600 text-purple-600 dark:text-purple-400'
-              : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-          }`}
-          onClick={() => setActiveTab('productivity')}
-        >
-          Productivity
         </button>
       </div>
 
@@ -467,79 +380,7 @@ export default function Reports() {
           </Card>
         )}
 
-        {/* DEPARTMENT TAB */}
-        {activeTab === 'department' && (
-          <Card className="border-0 shadow-sm rounded-2xl bg-white dark:bg-gray-950 p-6">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white">Average Daily Productivity</h3>
-                <p className="text-xs text-gray-500">Average working hours by organizational department</p>
-              </div>
-            </div>
 
-            <div className="h-[350px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={data?.department ?? []}
-                  margin={{ top: 10, right: 10, left: -10, bottom: 0 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" className="dark:stroke-gray-800" />
-                  <XAxis dataKey="department" stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis
-                    stroke="#9ca3af"
-                    fontSize={11}
-                    tickLine={false}
-                    axisLine={false}
-                    tickFormatter={(v) => `${v}h`}
-                  />
-                  <Tooltip content={<DeptTooltip />} />
-                  <Bar
-                    dataKey="productivity"
-                    name="Productivity"
-                    fill="#a855f7"
-                    radius={[6, 6, 0, 0]}
-                    maxBarSize={45}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </Card>
-        )}
-
-        {/* PRODUCTIVITY TAB */}
-        {activeTab === 'productivity' && (
-          <Card className="border-0 shadow-sm rounded-2xl bg-white dark:bg-gray-950 p-6">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white">Inventory Stock vs Min Levels</h3>
-                <p className="text-xs text-gray-500">Current stock quantities compared with set safety thresholds by category</p>
-              </div>
-            </div>
-
-            <div className="h-[350px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={data?.productivity ?? []}
-                  margin={{ top: 10, right: 10, left: -10, bottom: 0 }}
-                  barGap={6}
-                >
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" className="dark:stroke-gray-800" />
-                  <XAxis dataKey="category" stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis
-                    stroke="#9ca3af"
-                    fontSize={11}
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <Tooltip content={<ProdTooltip />} />
-                  <Legend />
-                  <Bar dataKey="stock_level" name="Stock Level" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={30} />
-                  <Bar dataKey="min_stock_level" name="Min Stock Level" fill="#f43f5e" radius={[4, 4, 0, 0]} maxBarSize={30} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </Card>
-        )}
       </div>
     </div>
   );

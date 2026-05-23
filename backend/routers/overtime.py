@@ -113,7 +113,9 @@ async def list_overtimes(
     org: Optional[Organization] = Depends(get_current_org)
 ):
     skip, limit = paginate_params(page, per_page)
-    query = org_filter(org)
+    query: dict = {}
+    if org:
+        query["org_id"] = str(org.id)
 
     items = await Overtime.find(query).sort("-date").skip(skip).limit(limit).to_list()
     total = await Overtime.find(query).count()
@@ -155,7 +157,10 @@ async def delete_overtime(
     org_id_str = str(org.id) if org else str(current_user.org_id)
     overtime_obj_id = parse_object_id(overtime_id, "overtime_id")
     
-    overtime = await Overtime.find_one(org_filter(org, {"_id": overtime_obj_id}))
+    del_query: dict = {"_id": overtime_obj_id}
+    if org:
+        del_query["org_id"] = str(org.id)
+    overtime = await Overtime.find_one(del_query)
     if not overtime:
         raise HTTPException(status_code=404, detail="Overtime record not found")
 

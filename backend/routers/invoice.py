@@ -187,15 +187,24 @@ async def delete_invoice(
 
 
 async def sync_invoice_to_sale(invoice: Invoice) -> None:
-    """Helper to sync paid invoices to the sales collection."""
+    """Helper to sync invoices to the sales collection with their respective status."""
     from models.sale import Sale, SaleItem
 
     existing_sale = await Sale.find_one(Sale.linked_invoice_id == str(invoice.id))
 
-    if invoice.is_deleted or invoice.status != "paid":
+    if invoice.is_deleted:
         if existing_sale:
             await existing_sale.delete()
         return
+
+    # Map invoice status to sale status
+    if invoice.status == "paid":
+        sale_status = "Completed"
+    elif invoice.status == "cancelled":
+        sale_status = "Cancelled"
+    else:
+        # draft, sent, overdue are mapped to Pending
+        sale_status = "Pending"
 
     # Map LineItem to SaleItem
     sale_items = []
@@ -218,6 +227,7 @@ async def sync_invoice_to_sale(invoice: Invoice) -> None:
         existing_sale.tax = invoice.tax_amount
         existing_sale.total_amount = invoice.total
         existing_sale.sale_date = invoice.payment_date or invoice.created_at
+        existing_sale.status = sale_status
         existing_sale.updated_at = utc_now()
         await existing_sale.save()
     else:
@@ -231,7 +241,7 @@ async def sync_invoice_to_sale(invoice: Invoice) -> None:
             discount=invoice.discount,
             tax=invoice.tax_amount,
             total_amount=invoice.total,
-            status="Completed",
+            status=sale_status,
             linked_invoice_id=str(invoice.id),
             created_by=str(invoice.created_by)
         )

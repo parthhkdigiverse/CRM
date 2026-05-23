@@ -34,18 +34,18 @@ async def lifespan(app: FastAPI):
     await init_db()
     logging.info("Database connection initialized.")
     
-    # Sync existing paid invoices to the Sales collection
+    # Sync existing invoices to the Sales collection
     try:
         from routers.invoice import sync_invoice_to_sale
         from models.invoice import Invoice
-        logging.info("Checking for unsynced paid invoices...")
-        paid_invoices = await Invoice.find(Invoice.status == "paid", Invoice.is_deleted == False).to_list()
+        logging.info("Checking for unsynced invoices...")
+        all_invoices = await Invoice.find(Invoice.is_deleted == False).to_list()
         count = 0
-        for inv in paid_invoices:
+        for inv in all_invoices:
             await sync_invoice_to_sale(inv)
             count += 1
         if count > 0:
-            logging.info(f"Verified/synced {count} existing paid invoices to the Sales collection.")
+            logging.info(f"Verified/synced {count} existing invoices to the Sales collection.")
     except Exception as e:
         logging.error(f"Failed to run startup invoice-sales migration: {e}")
         

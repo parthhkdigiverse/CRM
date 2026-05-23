@@ -26,7 +26,11 @@ export interface Sale {
 
 export const getSales = async (): Promise<Sale[]> => {
   const response = await apiClient.get('/sales/');
-  return Array.isArray(response.data?.data) ? response.data.data : [];
+  const data = response.data?.data;
+  if (data && Array.isArray(data.data)) {
+    return data.data;
+  }
+  return Array.isArray(data) ? data : [];
 };
 
 export const createSale = async (data: Partial<Sale>) => {

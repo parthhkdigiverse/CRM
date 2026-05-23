@@ -124,10 +124,20 @@ export default function AttendancePage() {
     }
   };
 
+  const parseUTCDate = (timeStr: string | null | undefined) => {
+    if (!timeStr) return null;
+    let isoStr = timeStr;
+    if (typeof timeStr === 'string' && !timeStr.endsWith('Z') && !/[+-]\d{2}(:?\d{2})?$/.test(timeStr)) {
+      isoStr = timeStr + 'Z';
+    }
+    return new Date(isoStr);
+  };
+
   const formatTime = (timeStr: string | null) => {
     if (!timeStr) return '—';
     try {
-      return new Date(timeStr).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' });
+      const date = parseUTCDate(timeStr);
+      return date ? date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' }) : '—';
     } catch { return '—'; }
   };
 
@@ -151,12 +161,17 @@ export default function AttendancePage() {
       return isOnBreak ? 'On Break' : 'Active Now';
     }
     try {
-      let totalMs = new Date(record.check_out).getTime() - new Date(record.check_in).getTime();
+      const checkInDate = parseUTCDate(record.check_in);
+      const checkOutDate = parseUTCDate(record.check_out);
+      if (!checkInDate || !checkOutDate) return '—';
+      let totalMs = checkOutDate.getTime() - checkInDate.getTime();
       
       if (record.breaks && record.breaks.length > 0) {
         record.breaks.forEach((b: any) => {
-          if (b.break_in && b.break_out) {
-            totalMs -= new Date(b.break_out).getTime() - new Date(b.break_in).getTime();
+          const breakInDate = parseUTCDate(b.break_in);
+          const breakOutDate = parseUTCDate(b.break_out);
+          if (breakInDate && breakOutDate) {
+            totalMs -= breakOutDate.getTime() - breakInDate.getTime();
           }
         });
       }

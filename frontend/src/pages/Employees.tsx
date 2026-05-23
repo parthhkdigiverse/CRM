@@ -12,9 +12,6 @@ import {
   SlidersHorizontal,
   Award,
   TrendingUp,
-  FileText,
-  CreditCard,
-  Briefcase,
   Inbox,
   Trash2,
   Edit2,
@@ -196,36 +193,6 @@ export default function Employees() {
         </div>
       </div>
 
-      {/* Quick HR Tools Banner (Horizontal) */}
-      <div className="bg-gradient-to-r from-gray-900 via-indigo-900 to-purple-900 text-white rounded-2xl p-6 shadow-xl relative overflow-hidden flex flex-col sm:flex-row items-center justify-between gap-6">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl pointer-events-none transform translate-x-1/3 -translate-y-1/3" />
-        <div className="absolute bottom-0 left-0 w-48 h-48 bg-purple-500/20 rounded-full blur-2xl pointer-events-none transform -translate-x-1/2 translate-y-1/2" />
-        
-        <div className="relative z-10">
-          <h2 className="text-lg font-bold flex items-center gap-2">
-            <Briefcase className="h-5 w-5 text-purple-300" />
-            Quick HR Actions
-          </h2>
-          <p className="text-sm text-gray-300 mt-1 max-w-md">Access commonly used HR tools and document generators instantly.</p>
-        </div>
-        
-        <div className="flex flex-wrap items-center gap-3 relative z-10">
-          {[
-            { label: 'Offer Letter', icon: FileText },
-            { label: 'ID Card', icon: CreditCard },
-            { label: 'Payslip', icon: FileText },
-          ].map((tool, i) => (
-            <button 
-              key={i} 
-              onClick={() => toast(`${tool.label} generation coming soon!`)}
-              className="flex items-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/20 border border-white/10 hover:border-white/20 rounded-xl text-sm font-semibold tracking-wide transition-all duration-300 hover:scale-105 active:scale-95 backdrop-blur-sm"
-            >
-              <tool.icon className="h-4 w-4 opacity-80" />
-              <span>{tool.label}</span>
-            </button>
-          ))}
-        </div>
-      </div>
 
       {/* Metric Cards Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

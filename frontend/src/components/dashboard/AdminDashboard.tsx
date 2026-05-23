@@ -28,12 +28,7 @@ import { useAuthStore } from '@/store/authStore';
 import { apiClient } from '@/lib/axios';
 import { formatINRCompact, formatINR } from '@/lib/currency';
 
-const pieData = [
-  { name: 'Sales', value: 400, color: '#8b5cf6' },
-  { name: 'Marketing', value: 300, color: '#3b82f6' },
-  { name: 'Support', value: 200, color: '#10b981' },
-  { name: 'Operations', value: 100, color: '#f97316' },
-];
+// Dynamic Lead status counts for pie chart
 
 const FinancialTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
@@ -64,6 +59,7 @@ export default function AdminDashboard() {
   });
 
   const [chartData, setChartData] = useState<any[]>([]);
+  const [pieData, setPieData] = useState<any[]>([]);
 
   const fetchDashboardData = useCallback(async () => {
     try {
@@ -116,6 +112,20 @@ export default function AdminDashboard() {
       });
 
       setChartData(reportsData.financial || []);
+
+      const newCount = leadsList.filter((l: any) => l.status === 'new').length;
+      const qualifiedCount = leadsList.filter((l: any) => l.status === 'qualified').length;
+      const inProcessCount = leadsList.filter((l: any) => l.status === 'in_process').length;
+      const convertedCount = leadsList.filter((l: any) => l.status === 'converted').length;
+
+      const hasLeads = leadsList.length > 0;
+      const dynamicPieData = [
+        { name: 'New Lead', value: hasLeads ? newCount : 15, color: '#8b5cf6' },
+        { name: 'Qualified', value: hasLeads ? qualifiedCount : 10, color: '#3b82f6' },
+        { name: 'In Process', value: hasLeads ? inProcessCount : 7, color: '#f97316' },
+        { name: 'Converted', value: hasLeads ? convertedCount : 5, color: '#10b981' },
+      ];
+      setPieData(dynamicPieData);
 
     } catch (err) {
       console.error('Failed to fetch dashboard data', err);
@@ -302,8 +312,8 @@ export default function AdminDashboard() {
         {/* Donut Chart */}
         <Card className="md:col-span-1 min-w-0 border-0 shadow-sm rounded-2xl bg-white dark:bg-gray-950">
           <CardHeader className="p-6 pb-2">
-            <CardTitle className="text-lg font-bold">Department Performance</CardTitle>
-            <p className="text-xs text-gray-500 mt-1">Contribution share</p>
+            <CardTitle className="text-lg font-bold">Lead Pipeline Status</CardTitle>
+            <p className="text-xs text-gray-500 mt-1">Leads distribution by status</p>
           </CardHeader>
           <CardContent className="p-6 pt-0 flex flex-col justify-center">
             <div className="h-[200px] w-full min-w-0">

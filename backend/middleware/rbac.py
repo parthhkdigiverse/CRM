@@ -15,6 +15,7 @@ ROLE_PERMISSIONS = {
         'attendance': 'full', 'payroll': 'full', 'targets': 'full', 'meetings': 'full',
         'documents': 'full', 'ai': 'full', 'audit_logs': 'full', 'settings': 'full',
         'organization': 'full', 'admin_panel': 'full', 'inventory': 'full', 'sales': 'full',
+        'finance': 'full', 'reports': 'full',
     },
     'admin': {
         'leads': 'full', 'contacts': 'full', 'companies': 'full', 'deals': 'full',
@@ -22,6 +23,7 @@ ROLE_PERMISSIONS = {
         'attendance': 'full', 'payroll': 'full', 'targets': 'full', 'meetings': 'full',
         'documents': 'full', 'ai': 'full', 'audit_logs': 'full', 'settings': 'full',
         'organization': 'full', 'inventory': 'full', 'sales': 'full',
+        'finance': 'full', 'reports': 'full',
     },
     'hr': {
         'leads': 'full', 'contacts': 'full', 'companies': 'read', 'deals': 'read',

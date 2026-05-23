@@ -13,9 +13,9 @@ export interface InventoryProduct {
   updated_at: string;
 }
 
-export const getInventory = async () => {
+export const getInventory = async (): Promise<InventoryProduct[]> => {
   const response = await apiClient.get('/inventory/');
-  return response.data.data;
+  return Array.isArray(response.data?.data) ? response.data.data : [];
 };
 
 export const createProduct = async (data: Partial<InventoryProduct>) => {

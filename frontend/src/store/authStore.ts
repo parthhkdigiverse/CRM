@@ -43,11 +43,21 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'ai-setu-auth',
+      partialize: (state) => ({
+        user: state.user,
+        organization: state.organization,
+        accessToken: state.accessToken,
+        isAuthenticated: state.isAuthenticated,
+      }),
       onRehydrateStorage: () => (state) => {
-        if (state && state.accessToken) {
-          apiClient.defaults.headers.common['Authorization'] = `Bearer ${state.accessToken}`;
+        if (state) {
+          if (state.accessToken) {
+            apiClient.defaults.headers.common['Authorization'] = `Bearer ${state.accessToken}`;
+          }
+          state.setLoading(false);
+        } else {
+          useAuthStore.setState({ isLoading: false });
         }
-        if (state) state.isLoading = false;
       },
     }
   )

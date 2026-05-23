@@ -70,6 +70,8 @@ const navigation = [
   {
     title: 'FINANCE & REPORTS',
     items: [
+      { name: 'Finance', href: '/finance', icon: CreditCard, isComingSoon: false, allowedRoles: ['super_admin', 'admin'] },
+      { name: 'Reports', href: '/reports', icon: TrendingUp, isComingSoon: false, allowedRoles: ['super_admin', 'admin'] },
       { name: 'Invoices', href: '/invoices', icon: Receipt, isComingSoon: false, allowedRoles: ['super_admin', 'admin'] },
     ]
   }

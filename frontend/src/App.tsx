@@ -1,7 +1,9 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect } from 'react';
 import { useAuthStore } from './store/authStore';
 import { Toaster } from 'sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { apiClient } from './lib/axios';
 
 // Layout
 import AppLayout from './components/layout/AppLayout';
@@ -31,6 +33,8 @@ import AIAssistant from './pages/AIAssistant';
 import Settings from './pages/Settings';
 import Payroll from './pages/Payroll';
 import Targets from './pages/Targets';
+import Finance from './pages/Finance';
+import Reports from './pages/Reports';
 
 // New Pages
 import AccessDenied from './pages/AccessDenied';
@@ -92,6 +96,71 @@ const SuperAdminRedirect = ({ children }: { children: React.ReactNode }) => {
 };
 
 function App() {
+  const { login, logout, setLoading } = useAuthStore();
+
+  useEffect(() => {
+    const tryRefreshSession = async () => {
+      // Only attempt refresh if there's persisted auth data
+      const stored = localStorage.getItem('ai-setu-auth');
+      let hasSavedSession = false;
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          hasSavedSession = !!parsed?.state?.isAuthenticated;
+        } catch {
+          // ignore parse errors
+        }
+      }
+
+      if (!hasSavedSession) {
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      try {
+        // Attempt silent token refresh using the HTTP-only refresh_token cookie
+        const refreshRes = await apiClient.post('/auth/refresh');
+        const newAccessToken = refreshRes.data?.data?.access_token;
+
+        if (newAccessToken) {
+          // Set the new token on axios defaults for the /auth/me call
+          apiClient.defaults.headers.common['Authorization'] = `Bearer ${newAccessToken}`;
+
+          // Fetch fresh user profile
+          const meRes = await apiClient.get('/auth/me');
+          const u = meRes.data?.data;
+
+          if (u) {
+            const userData = {
+              id: u.id,
+              email: u.email,
+              full_name: `${u.first_name || ''} ${u.last_name || ''}`.trim() || u.email,
+              role: u.role,
+              org_id: u.org_id,
+              avatar_url: u.avatar_url,
+              first_name: u.first_name,
+              last_name: u.last_name,
+              phone: u.phone,
+              timezone: u.timezone,
+            };
+            const org = u.org_id ? { id: u.org_id, name: 'My Organization' } : undefined;
+            login(userData, newAccessToken, org);
+          } else {
+            logout();
+          }
+        } else {
+          logout();
+        }
+      } catch {
+        // Refresh failed (401 or network error) — session is invalid
+        logout();
+      }
+    };
+
+    tryRefreshSession();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <TooltipProvider>
       <Router>
@@ -158,6 +227,16 @@ function App() {
             <Route path="invoices" element={
               <RoleProtectedRoute roles={['super_admin', 'admin']}>
                 <Invoices />
+              </RoleProtectedRoute>
+            } />
+            <Route path="finance" element={
+              <RoleProtectedRoute roles={['super_admin', 'admin']}>
+                <Finance />
+              </RoleProtectedRoute>
+            } />
+            <Route path="reports" element={
+              <RoleProtectedRoute roles={['super_admin', 'admin']}>
+                <Reports />
               </RoleProtectedRoute>
             } />
             <Route path="settings" element={

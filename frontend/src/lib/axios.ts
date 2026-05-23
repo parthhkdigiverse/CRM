@@ -27,36 +27,77 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
-// Track if we're already redirecting to prevent multiple redirects
-let isRedirecting = false;
+// Track if we're already refreshing to prevent multiple simultaneous refresh attempts
+let isRefreshing = false;
+let refreshSubscribers: ((token: string) => void)[] = [];
+
+function onTokenRefreshed(token: string) {
+  refreshSubscribers.forEach((cb) => cb(token));
+  refreshSubscribers = [];
+}
+
+function addRefreshSubscriber(cb: (token: string) => void) {
+  refreshSubscribers.push(cb);
+}
 
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
-    // Only auto-redirect on write operations (POST/PUT/DELETE), not background GETs
-    const method = error.config?.method?.toUpperCase();
-    const isWriteOp = method === 'POST' || method === 'PUT' || method === 'DELETE';
+    const originalRequest = error.config;
 
-    if (error.response?.status === 401 && isWriteOp && !isRedirecting) {
-      const stored = localStorage.getItem('ai-setu-auth');
-      if (stored) {
+    // Skip refresh logic for the refresh endpoint itself to avoid infinite loops
+    if (error.response?.status === 401 && !originalRequest._retry && !originalRequest.url?.includes('/auth/refresh')) {
+      originalRequest._retry = true;
+
+      if (!isRefreshing) {
+        isRefreshing = true;
         try {
-          const parsed = JSON.parse(stored);
-          if (parsed?.state?.accessToken) {
-            isRedirecting = true;
-            toast.error('Session expired — redirecting to login...');
-            localStorage.removeItem('ai-setu-auth');
-            setTimeout(() => {
-              window.location.href = '/login';
-              // Reset flag after redirect
-              setTimeout(() => { isRedirecting = false; }, 3000);
-            }, 1200);
+          const refreshRes = await axios.post(`${API_URL}/auth/refresh`, {}, { withCredentials: true });
+          const newToken = refreshRes.data?.data?.access_token;
+          if (newToken) {
+            // Update the stored token
+            const stored = localStorage.getItem('ai-setu-auth');
+            if (stored) {
+              try {
+                const parsed = JSON.parse(stored);
+                if (parsed?.state) {
+                  parsed.state.accessToken = newToken;
+                  localStorage.setItem('ai-setu-auth', JSON.stringify(parsed));
+                }
+              } catch { /* ignore */ }
+            }
+            apiClient.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+            onTokenRefreshed(newToken);
+            isRefreshing = false;
+
+            // Retry the original request with the new token
+            originalRequest.headers.Authorization = `Bearer ${newToken}`;
+            return apiClient(originalRequest);
+          } else {
+            throw new Error('No access token in refresh response');
           }
         } catch {
-          // ignore
+          isRefreshing = false;
+          refreshSubscribers = [];
+          // Refresh failed — session is truly expired
+          localStorage.removeItem('ai-setu-auth');
+          toast.error('Session expired — redirecting to login...');
+          setTimeout(() => {
+            window.location.href = '/login';
+          }, 1200);
+          return Promise.reject(error);
         }
+      } else {
+        // Another request triggered refresh; queue this one until refresh completes
+        return new Promise((resolve) => {
+          addRefreshSubscriber((token: string) => {
+            originalRequest.headers.Authorization = `Bearer ${token}`;
+            resolve(apiClient(originalRequest));
+          });
+        });
       }
     }
+
     return Promise.reject(error);
   }
 );

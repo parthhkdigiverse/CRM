@@ -41,9 +41,10 @@ export default function Inventory() {
   const fetchProducts = async () => {
     try {
       const data = await getInventory();
-      setProducts(data);
+      setProducts(Array.isArray(data) ? data : []);
     } catch (error) {
       toast.error('Failed to load inventory');
+      setProducts([]);
     } finally {
       setLoading(false);
     }

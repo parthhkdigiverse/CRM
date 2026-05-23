@@ -41,10 +41,12 @@ export default function Sales() {
         getSales(),
         getInventory()
       ]);
-      setSales(salesData);
-      setInventory(inventoryData);
+      setSales(Array.isArray(salesData) ? salesData : []);
+      setInventory(Array.isArray(inventoryData) ? inventoryData : []);
     } catch (error) {
       toast.error('Failed to load data');
+      setSales([]);
+      setInventory([]);
     } finally {
       setLoading(false);
     }

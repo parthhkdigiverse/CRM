@@ -24,6 +24,7 @@ from services import auth_service
 from services import oauth_service
 from services.audit_service import log_action
 from utils.helpers import utc_now
+from utils.file_validation import validate_upload
 
 router = APIRouter(prefix="/api/v1/auth", tags=["Auth"])
 
@@ -36,8 +37,6 @@ async def register(data: RegisterRequest):
         # We don't log registration to audit log until they verify, or we could.
         return SuccessResponse(message="Registration successful. Please check your email for the verification code.")
     except ValueError as e:
-        import traceback
-        traceback.print_exc()
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
@@ -66,8 +65,8 @@ async def login(data: LoginRequest, request: Request, response: Response):
             key="refresh_token",
             value=refresh_token,
             httponly=True,
-            secure=True,  # In production should be True based on APP_ENV
-            samesite="lax",
+            secure=True,
+            samesite="strict",
             max_age=30 * 24 * 60 * 60 if data.remember_me else 7 * 24 * 60 * 60,
         )
 
@@ -109,7 +108,7 @@ async def refresh(request: Request, response: Response):
             value=new_refresh,
             httponly=True,
             secure=True,
-            samesite="lax",
+            samesite="strict",
             max_age=7 * 24 * 60 * 60,  # Default 7 days on refresh
         )
 
@@ -152,13 +151,13 @@ async def google_callback(code: str, request: Request, response: Response):
             value=refresh_token,
             httponly=True,
             secure=True,
-            samesite="lax",
+            samesite="strict",
             max_age=7 * 24 * 60 * 60,
         )
 
-        # Pass token in URL hash so frontend can grab it
+        # Do not place bearer tokens in URLs. The frontend can call /refresh using the secure cookie.
         from config import settings
-        frontend_url = f"{settings.FRONTEND_URL}/oauth/callback#token={access_token}"
+        frontend_url = f"{settings.FRONTEND_URL}/oauth/callback"
         return RedirectResponse(url=frontend_url)
     except ValueError as e:
         # Redirect to frontend with error
@@ -268,18 +267,28 @@ async def upload_avatar(
 ):
     """Upload user avatar image."""
     import os
-    import shutil
+    import asyncio
+    import secrets
     from config import settings
     
     avatar_dir = os.path.join(os.getcwd(), "storage", "avatars")
     os.makedirs(avatar_dir, exist_ok=True)
     
-    file_extension = file.filename.split('.')[-1].lower() if '.' in file.filename else 'png'
-    file_name = f"{current_user.id}_{int(utc_now().timestamp())}.{file_extension}"
+    upload = await validate_upload(file, allow_images_only=True)
+    file_name = f"{current_user.id}_{int(utc_now().timestamp())}_{secrets.token_hex(8)}.{upload.extension}"
     file_path = os.path.join(avatar_dir, file_name)
-    
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+
+    async def write_avatar() -> None:
+        with open(file_path, "wb") as buffer:
+            while content := await file.read(1024 * 1024):
+                buffer.write(content)
+
+    try:
+        await write_avatar()
+    except Exception:
+        if os.path.exists(file_path):
+            await asyncio.to_thread(os.remove, file_path)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to save avatar")
         
     avatar_url = f"{settings.BACKEND_URL}/storage/avatars/{file_name}"
     

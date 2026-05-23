@@ -25,6 +25,7 @@ class Lead(Document):
     assigned_to: Optional[PydanticObjectId] = None
     follow_up_date: Optional[datetime] = None
     notes: Optional[str] = None
+    address: Optional[str] = None
     score_history: List[Dict] = Field(default_factory=list)  # [{score, reason, timestamp}]
     converted_deal_id: Optional[PydanticObjectId] = None
 

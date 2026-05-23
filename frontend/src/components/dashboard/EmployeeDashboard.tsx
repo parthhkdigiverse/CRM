@@ -43,7 +43,7 @@ export default function EmployeeDashboard() {
       const targets = targetsRes.data.data || [];
       const attendance = attendanceRes.data.data?.records || [];
       const meetings = meetingsRes.data.data || [];
-      const projects = projectsRes.data.data || [];
+      const projects = projectsRes.data.data.data || [];
       const employees = empRes.data.data || [];
 
       // Map the current authenticated User ID to their Employee record ID
@@ -67,7 +67,11 @@ export default function EmployeeDashboard() {
         meetingsToday,
       });
 
-      const myProjectsList = projects.filter((p: any) => p.assignee_ids && p.assignee_ids.includes(myEmployeeId));
+      const myProjectsList = projects.filter((p: any) => 
+        p.assignee_ids && 
+        p.assignee_ids.includes(myEmployeeId) &&
+        p.status !== 'completed'
+      );
       setMyProjects(myProjectsList);
 
     } catch (err) {
@@ -196,10 +200,7 @@ export default function EmployeeDashboard() {
                 </div>
                 <h3 className="font-bold text-gray-900 dark:text-white truncate group-hover:text-purple-600">{project.title}</h3>
                 <p className="text-xs text-gray-500 mt-1 truncate">{project.client_name || 'Internal'}</p>
-                <div className="mt-4 pt-4 border-t border-gray-50 dark:border-gray-900/50 flex justify-between items-center text-xs font-semibold text-gray-500">
-                  <span>Progress</span>
-                  <span className="text-purple-600 dark:text-purple-400">{project.progress}%</span>
-                </div>
+
               </div>
             ))}
           </div>

@@ -11,6 +11,7 @@ from beanie import PydanticObjectId
 from models.audit_log import AuditLog
 from models.activity import Activity
 from utils.helpers import utc_now
+from utils.logging import redact
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +37,7 @@ async def log_action(
             action=action,
             module=module,
             entity_id=PydanticObjectId(entity_id) if entity_id else None,
-            changes=changes or {},
+            changes=redact(changes or {}),
             ip_address=ip,
             user_agent=user_agent[:255] if user_agent else None,
             created_by=PydanticObjectId(user_id),
@@ -66,7 +67,7 @@ async def log_activity(
             description=description,
             entity_type=entity_type,
             entity_id=PydanticObjectId(entity_id),
-            metadata=metadata or {},
+            metadata=redact(metadata or {}),
             created_by=PydanticObjectId(user_id),
         )
         await entry.insert()

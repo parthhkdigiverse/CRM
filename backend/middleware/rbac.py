@@ -14,26 +14,27 @@ ROLE_PERMISSIONS = {
         'invoices': 'full', 'projects': 'full', 'tasks': 'full', 'employees': 'full',
         'attendance': 'full', 'payroll': 'full', 'targets': 'full', 'meetings': 'full',
         'documents': 'full', 'ai': 'full', 'audit_logs': 'full', 'settings': 'full',
-        'organization': 'full', 'admin_panel': 'full',
+        'organization': 'full', 'admin_panel': 'full', 'inventory': 'full', 'sales': 'full',
     },
     'admin': {
         'leads': 'full', 'contacts': 'full', 'companies': 'full', 'deals': 'full',
         'invoices': 'full', 'projects': 'full', 'tasks': 'full', 'employees': 'full',
         'attendance': 'full', 'payroll': 'full', 'targets': 'full', 'meetings': 'full',
         'documents': 'full', 'ai': 'full', 'audit_logs': 'full', 'settings': 'full',
-        'organization': 'full',
+        'organization': 'full', 'inventory': 'full', 'sales': 'full',
     },
     'hr': {
         'leads': 'full', 'contacts': 'full', 'companies': 'read', 'deals': 'read',
         'invoices': 'read', 'projects': 'read', 'tasks': 'full', 'employees': 'full',
         'attendance': 'full', 'payroll': 'full', 'targets': 'full', 'meetings': 'full',
         'documents': 'full', 'ai': 'full', 'audit_logs': 'read',
+        'inventory': 'read', 'sales': 'read',
     },
     'employee': {
         'contacts': 'read', 'companies': 'read', 'projects': 'own',
         'tasks': 'own', 'attendance': 'own', 'targets': 'own',
         'meetings': 'own', 'documents': 'own', 'ai': 'full',
-        'payroll': 'own', 'employees': 'read',
+        'payroll': 'own', 'employees': 'read', 'inventory': 'read', 'sales': 'own',
     },
 }
 

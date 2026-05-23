@@ -145,7 +145,8 @@ async def create_lead(
             assigned_to=lead.assigned_to,
             org_id=lead.org_id,
             created_by=current_user.id,
-            linked_lead_id=lead.id
+            linked_lead_id=lead.id,
+            address={"street": lead.address} if lead.address else None
         )
         await new_company.insert()
     else:
@@ -163,7 +164,8 @@ async def create_lead(
             assigned_to=lead.assigned_to,
             org_id=lead.org_id,
             created_by=current_user.id,
-            linked_lead_id=lead.id
+            linked_lead_id=lead.id,
+            custom_fields={"address": lead.address} if lead.address else {}
         )
         await new_contact.insert()
     
@@ -278,6 +280,11 @@ async def update_lead(
             existing_company.assigned_to = lead.assigned_to
             existing_company.contact_name = lead.name
             existing_company.annual_revenue = lead.value
+            if lead.address:
+                if existing_company.address:
+                    existing_company.address["street"] = lead.address
+                else:
+                    existing_company.address = {"street": lead.address}
             await existing_company.save()
         else:
             new_company = Company(
@@ -289,7 +296,8 @@ async def update_lead(
                 created_by=current_user.id,
                 linked_lead_id=lead.id,
                 contact_name=lead.name,
-                annual_revenue=lead.value
+                annual_revenue=lead.value,
+                address={"street": lead.address} if lead.address else None
             )
             await new_company.insert()
             
@@ -313,6 +321,8 @@ async def update_lead(
             existing_contact.phone = lead.phone
             existing_contact.job_title = lead.job_title
             existing_contact.assigned_to = lead.assigned_to
+            if lead.address:
+                existing_contact.custom_fields["address"] = lead.address
             await existing_contact.save()
         else:
             new_contact = Contact(
@@ -325,7 +335,8 @@ async def update_lead(
                 assigned_to=lead.assigned_to,
                 org_id=lead.org_id,
                 created_by=current_user.id,
-                linked_lead_id=lead.id
+                linked_lead_id=lead.id,
+                custom_fields={"address": lead.address} if lead.address else {}
             )
             await new_contact.insert()
             
@@ -341,6 +352,8 @@ async def update_lead(
                 contact.phone = lead.phone
                 contact.job_title = lead.job_title
                 contact.assigned_to = lead.assigned_to
+                if lead.address:
+                    contact.custom_fields["address"] = lead.address
                 await contact.save()
         else:
             company_name = lead.company if lead.company else lead.name
@@ -352,6 +365,11 @@ async def update_lead(
                 company.assigned_to = lead.assigned_to
                 company.contact_name = lead.name
                 company.annual_revenue = lead.value
+                if lead.address:
+                    if company.address:
+                        company.address["street"] = lead.address
+                    else:
+                        company.address = {"street": lead.address}
                 await company.save()
         
     new_score = calculate_lead_score(lead)

@@ -244,6 +244,9 @@ async def forgot_password(email: str) -> None:
     token_payload = {
         "sub": str(user.id),
         "type": "password_reset",
+        "iss": settings.JWT_ISSUER,
+        "aud": settings.JWT_AUDIENCE,
+        "iat": utc_now(),
         "exp": utc_now() + timedelta(hours=1),
     }
     reset_token = jose_jwt.encode(
@@ -263,7 +266,12 @@ async def reset_password(token: str, new_password: str) -> None:
 
     try:
         payload = jose_jwt.decode(
-            token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM]
+            token,
+            settings.JWT_SECRET_KEY,
+            algorithms=[settings.JWT_ALGORITHM],
+            issuer=settings.JWT_ISSUER,
+            audience=settings.JWT_AUDIENCE,
+            options={"require_exp": True, "require_iat": True, "require_sub": True},
         )
     except JWTError:
         raise ValueError("Invalid or expired reset token")

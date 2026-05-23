@@ -1,9 +1,16 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { apiClient } from '@/lib/axios';
 import { toast } from 'sonner';
 import FormDrawer, { FormField, ChipSelect, inputClass, textareaClass } from '@/components/FormDrawer';
 import MoreDetails from '@/components/MoreDetails';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface NewEmployeeDialogProps {
   open: boolean;
@@ -27,13 +34,52 @@ const emptyForm = {
   salary: '', manager: '', address: '', skills: '', notes: '',
 };
 
+interface ManagerOption {
+  id: string;
+  name: string;
+  role?: string;
+  department?: string;
+}
+
+const unwrapList = <T,>(payload: any): T[] => {
+  const data = payload?.data;
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.data)) return data.data;
+  return [];
+};
+
 export default function NewEmployeeDialog({ open, onOpenChange, onEmployeeCreated }: NewEmployeeDialogProps) {
   const [loading, setLoading] = useState(false);
+  const [managersLoading, setManagersLoading] = useState(false);
+  const [managerOptions, setManagerOptions] = useState<ManagerOption[]>([]);
   const [form, setForm] = useState({ ...emptyForm });
 
   const u = (field: string, value: string) => setForm((p) => ({ ...p, [field]: value }));
 
+  useEffect(() => {
+    if (!open) return;
+
+    let cancelled = false;
+    const fetchManagers = async () => {
+      setManagersLoading(true);
+      try {
+        const res = await apiClient.get('/employees/managers');
+        if (!cancelled) setManagerOptions(unwrapList<ManagerOption>(res.data));
+      } catch {
+        if (!cancelled) setManagerOptions([]);
+      } finally {
+        if (!cancelled) setManagersLoading(false);
+      }
+    };
+
+    fetchManagers();
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
   const submit = async (): Promise<boolean> => {
+    if (loading) return false;
     if (!form.name.trim()) { toast.error('Employee Name is required'); return false; }
     if (!form.email.trim()) { toast.error('Email address is required'); return false; }
     if (!form.password.trim()) { toast.error('Password is required to create a user account'); return false; }
@@ -50,7 +96,7 @@ export default function NewEmployeeDialog({ open, onOpenChange, onEmployeeCreate
         join_date: form.join_date ? new Date(form.join_date).toISOString() : new Date().toISOString(),
       };
       if (form.phone.trim()) payload.phone = form.phone.trim();
-      if (form.manager.trim()) payload.reporting_to = form.manager.trim();
+      if (form.manager) payload.reporting_to = form.manager;
       if (form.address.trim()) payload.address = form.address.trim();
       if (form.skills.trim()) payload.skills = form.skills.trim();
       if (form.notes.trim()) payload.notes = form.notes.trim();
@@ -127,7 +173,19 @@ export default function NewEmployeeDialog({ open, onOpenChange, onEmployeeCreate
       {/* More Details */}
       <MoreDetails>
         <FormField label="Manager">
-          <Input value={form.manager} onChange={(e) => u('manager', e.target.value)} placeholder="Reporting manager" className={inputClass} />
+          <Select value={form.manager || 'none'} onValueChange={(value) => u('manager', value === 'none' ? '' : value)}>
+            <SelectTrigger className="w-full rounded-xl border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50 h-9 text-sm">
+              <SelectValue placeholder={managersLoading ? 'Loading HR managers...' : 'Select HR manager'} />
+            </SelectTrigger>
+            <SelectContent className="z-[10000]">
+              <SelectItem value="none">No manager</SelectItem>
+              {managerOptions.map((manager) => (
+                <SelectItem key={manager.id} value={manager.id}>
+                  {manager.name} {manager.department ? `- ${manager.department}` : ''}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </FormField>
         <FormField label="Monthly Salary (₹)">
           <Input type="number" value={form.salary} onChange={(e) => u('salary', e.target.value)} placeholder="75000" className={inputClass} />

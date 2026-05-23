@@ -19,13 +19,19 @@ interface Lead {
   company?: string;
   source: string;
   status: string;
-  score: number;
   value: number;
   job_title?: string;
   assigned_to?: string;
   notes?: string;
   created_at: string;
 }
+
+const unwrapList = <T,>(payload: any): T[] => {
+  const data = payload?.data;
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.data)) return data.data;
+  return [];
+};
 
 const sourceColors: Record<string, string> = {
   web: 'bg-blue-50 text-blue-600 border-blue-100 dark:bg-blue-900/20 dark:text-blue-400',
@@ -45,7 +51,6 @@ const statusColors: Record<string, string> = {
 
 export default function Leads() {
   const [leads, setLeads] = useState<Lead[]>([]);
-  const [projects, setProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -57,17 +62,12 @@ export default function Leads() {
     try {
       const params: Record<string, string> = { per_page: '50' };
       if (search.trim()) params.search = search.trim();
-      const [leadsRes, projRes] = await Promise.all([
-        apiClient.get('/leads', { params }),
-        apiClient.get('/projects', { params: { per_page: 500 } })
-      ]);
-      setLeads(leadsRes.data.data || []);
-      setProjects(projRes.data.data || []);
+      const leadsRes = await apiClient.get('/leads', { params });
+      setLeads(unwrapList<Lead>(leadsRes.data));
     } catch (err: any) {
       // If not authenticated or no org, show empty state
-      console.warn('Could not fetch leads/projects:', err?.response?.status);
+      console.warn('Could not fetch leads:', err?.response?.status);
       setLeads([]);
-      setProjects([]);
     } finally {
       setLoading(false);
     }
@@ -178,7 +178,6 @@ export default function Leads() {
                 <tr>
                   <th className="px-6 py-4 font-semibold tracking-wider">Lead Name</th>
                   <th className="px-6 py-4 font-semibold tracking-wider">Source</th>
-                  <th className="px-6 py-4 font-semibold tracking-wider text-center">Score</th>
                   <th className="px-6 py-4 font-semibold tracking-wider">Company</th>
                   <th className="px-6 py-4 font-semibold tracking-wider text-center">Status</th>
                   <th className="px-6 py-4 font-semibold tracking-wider">Created</th>
@@ -202,9 +201,6 @@ export default function Leads() {
                     </td>
                     <td className="px-6 py-4">
                       <span className={cn("px-2.5 py-1 rounded-full text-xs font-medium border capitalize", sourceColors[l.source] || sourceColors.web)}>{l.source}</span>
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <span className={cn("font-bold", l.score >= 80 ? 'text-emerald-500' : l.score >= 60 ? 'text-orange-500' : l.score >= 40 ? 'text-yellow-600' : 'text-red-500')}>{l.score}</span>
                     </td>
                     <td className="px-6 py-4">
                       <div>

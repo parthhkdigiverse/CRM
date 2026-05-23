@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Plus, Trash2 } from 'lucide-react';
@@ -12,6 +12,8 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreated: () => void;
+  invoice?: any;
+  prefillProject?: any;
 }
 
 interface LineItem {
@@ -37,10 +39,55 @@ const emptyForm = {
   due_date: '', status: 'draft', discount: '0', notes: '', payment_method: '',
 };
 
-export default function NewInvoiceDialog({ open, onOpenChange, onCreated }: Props) {
+export default function NewInvoiceDialog({ open, onOpenChange, onCreated, invoice, prefillProject }: Props) {
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({ ...emptyForm });
   const [items, setItems] = useState<LineItem[]>([{ ...emptyItem }]);
+
+  useEffect(() => {
+    if (open) {
+      if (invoice) {
+        setForm({
+          customer: invoice.customer_name || '',
+          issue_date: invoice.created_at ? new Date(invoice.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+          due_date: invoice.due_date ? new Date(invoice.due_date).toISOString().split('T')[0] : '',
+          status: invoice.status || 'draft',
+          discount: String(invoice.discount || 0),
+          notes: invoice.notes || '',
+          payment_method: invoice.payment_terms || '',
+        });
+        if (invoice.line_items && invoice.line_items.length > 0) {
+          setItems(invoice.line_items.map((it: any) => ({
+            description: it.description || '',
+            quantity: String(it.quantity || 1),
+            unit_price: String(it.unit_price || 0),
+            tax_percent: String(it.tax_percent || 0),
+          })));
+        } else {
+          setItems([{ ...emptyItem }]);
+        }
+      } else if (prefillProject) {
+        setForm({
+          customer: prefillProject.client_name || 'Internal Client',
+          issue_date: new Date().toISOString().split('T')[0],
+          due_date: '',
+          status: 'pending',
+          discount: '0',
+          notes: `Project Code: ${prefillProject.project_code}`,
+          payment_method: '',
+        });
+        setItems([{
+          description: `Project Delivery: ${prefillProject.title}`,
+          quantity: '1',
+          unit_price: String(prefillProject.budget || 0),
+          tax_percent: '0',
+        }]);
+      } else {
+        setForm({ ...emptyForm });
+        setItems([{ ...emptyItem }]);
+      }
+    }
+  }, [open, invoice, prefillProject]);
 
   const u = (field: string, value: string) => setForm((p) => ({ ...p, [field]: value }));
 
@@ -80,12 +127,34 @@ export default function NewInvoiceDialog({ open, onOpenChange, onCreated }: Prop
       if (form.notes.trim()) payload.notes = form.notes.trim();
       if (form.payment_method.trim()) payload.payment_terms = form.payment_method.trim();
 
-      await apiClient.post('/invoices', payload);
-      toast.success('Invoice created successfully!');
+      if (invoice) {
+        await apiClient.put(`/invoices/${invoice.id}`, payload);
+        toast.success('Invoice updated successfully!');
+      } else {
+        await apiClient.post('/invoices', payload);
+        toast.success('Invoice created successfully!');
+      }
       return true;
     } catch (err: any) {
-      toast.error(err?.response?.data?.detail || 'Failed to create invoice');
+      toast.error(err?.response?.data?.detail || 'Failed to save invoice');
       return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!invoice?.id) return;
+    if (!window.confirm('Are you sure you want to delete this invoice?')) return;
+
+    setLoading(true);
+    try {
+      await apiClient.delete(`/invoices/${invoice.id}`);
+      toast.success('Invoice deleted successfully');
+      onOpenChange(false);
+      onCreated();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail || 'Failed to delete invoice');
     } finally {
       setLoading(false);
     }
@@ -105,11 +174,14 @@ export default function NewInvoiceDialog({ open, onOpenChange, onCreated }: Prop
     <FormDrawer
       open={open}
       onClose={() => !loading && onOpenChange(false)}
-      title="Create Invoice"
-      subtitle="Generate a new invoice for your client."
+      title={invoice ? 'Edit Invoice' : 'Create Invoice'}
+      subtitle={invoice ? `Modify details for invoice ${invoice.invoice_number}` : 'Generate a new invoice for your client.'}
       onSave={handleSave}
-      onSaveAndNew={handleSaveAndNew}
+      onSaveAndNew={invoice ? undefined : handleSaveAndNew}
       loading={loading}
+      editMode={!!invoice}
+      entityId={invoice?.id}
+      module="invoices"
     >
       <FormField label="Customer" required>
         <Input value={form.customer} onChange={(e) => u('customer', e.target.value)} placeholder="Client or company name" className={inputClass} autoFocus />
@@ -178,6 +250,21 @@ export default function NewInvoiceDialog({ open, onOpenChange, onCreated }: Prop
           </select>
         </FormField>
       </MoreDetails>
+
+      {invoice && (
+        <div className="border-t border-gray-100 dark:border-gray-800 pt-3 mt-4">
+          <Button 
+            type="button" 
+            variant="ghost" 
+            size="sm" 
+            className="text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20" 
+            onClick={handleDelete}
+            disabled={loading}
+          >
+            <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Delete Invoice
+          </Button>
+        </div>
+      )}
     </FormDrawer>
   );
 }

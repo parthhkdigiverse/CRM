@@ -30,6 +30,8 @@ def create_access_token(
         "org_id": org_id or "",
         "jti": str(uuid4()),
         "iat": now,
+        "iss": settings.JWT_ISSUER,
+        "aud": settings.JWT_AUDIENCE,
         "exp": now + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
         "type": "access",
     }
@@ -49,6 +51,8 @@ def create_refresh_token(user_id: str, remember_me: bool = False) -> Tuple[str, 
         "sub": user_id,
         "jti": jti,
         "iat": now,
+        "iss": settings.JWT_ISSUER,
+        "aud": settings.JWT_AUDIENCE,
         "exp": now + timedelta(days=days),
         "type": "refresh",
     }
@@ -66,6 +70,9 @@ def decode_access_token(token: str) -> dict:
             token,
             settings.JWT_SECRET_KEY,
             algorithms=[settings.JWT_ALGORITHM],
+            issuer=settings.JWT_ISSUER,
+            audience=settings.JWT_AUDIENCE,
+            options={"require_exp": True, "require_iat": True, "require_sub": True},
         )
         if payload.get("type") != "access":
             raise JWTError("Invalid token type")
@@ -84,6 +91,9 @@ def decode_refresh_token(token: str) -> dict:
             token,
             settings.JWT_SECRET_KEY,
             algorithms=[settings.JWT_ALGORITHM],
+            issuer=settings.JWT_ISSUER,
+            audience=settings.JWT_AUDIENCE,
+            options={"require_exp": True, "require_iat": True, "require_sub": True},
         )
         if payload.get("type") != "refresh":
             raise JWTError("Invalid token type")

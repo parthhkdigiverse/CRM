@@ -15,7 +15,8 @@ import {
   Search,
   CheckCircle,
   HelpCircle,
-  FileText
+  FileText,
+  Bell
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -44,15 +45,26 @@ const categoryColors: Record<string, string> = {
   HR: 'bg-blue-50 text-blue-600 border-blue-100 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-900/50',
 };
 
+const unwrapList = <T,>(payload: any): T[] => {
+  const data = payload?.data;
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.data)) return data.data;
+  return [];
+};
+
 export default function Tasks() {
   const { user } = useAuthStore();
   const isEmployee = user?.role === 'employee';
+  const isHR = user?.role === 'hr';
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
 
   const [tasks, setTasks] = useState<any[]>([]);
+  const [pendingAssignments, setPendingAssignments] = useState<any[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [assigningTaskId, setAssigningTaskId] = useState<string | null>(null);
   
   // Dialog form state
   const [selectedTask, setSelectedTask] = useState<any | null>(null);
@@ -67,22 +79,40 @@ export default function Tasks() {
   const [submitLoading, setSubmitLoading] = useState(false);
   const [draggedOverColumn, setDraggedOverColumn] = useState<string | null>(null);
 
+  const currentEmployee = employees.find(e => e.user_id === user?.id);
+  const reportedEmployees = employees.filter(e => e.reporting_to === currentEmployee?.id);
+
+  const assignableEmployees = employees.filter(emp => {
+    if (isAdmin && !selectedTask) {
+      return emp.role?.toLowerCase() === 'hr';
+    }
+    if (user?.role === 'hr') {
+      return emp.reporting_to === currentEmployee?.id;
+    }
+    return true;
+  });
+
   // Fetch tasks and employee assignees
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const [tasksRes, empRes] = await Promise.all([
+      const requests: Promise<any>[] = [
         apiClient.get('/tasks?per_page=100'),
         apiClient.get('/employees?per_page=100')
-      ]);
-      setTasks(tasksRes.data.data || []);
-      setEmployees(empRes.data.data || []);
+      ];
+      if (user?.role === 'hr') {
+        requests.push(apiClient.get('/tasks/pending-assignments'));
+      }
+      const [tasksRes, empRes, pendingRes] = await Promise.all(requests);
+      setTasks(unwrapList<any>(tasksRes.data));
+      setEmployees(unwrapList<any>(empRes.data));
+      setPendingAssignments(pendingRes ? unwrapList<any>(pendingRes.data) : []);
     } catch (error) {
       console.warn('Failed to fetch data:', error);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user?.role]);
 
   useEffect(() => {
     fetchData();
@@ -196,6 +226,16 @@ export default function Tasks() {
     }
   };
 
+  const handleAcceptAssignment = async (taskId: string) => {
+    try {
+      await apiClient.post(`/tasks/${taskId}/accept`);
+      toast.success('Task accepted and added to To Do');
+      await fetchData();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail || 'Failed to accept task');
+    }
+  };
+
   // Format date display (e.g. Oct 5)
   const formatDateDisplay = (dateStr: string | null) => {
     if (!dateStr) return '';
@@ -232,6 +272,8 @@ export default function Tasks() {
     (t.description && t.description.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
+  const completedTasks = filteredTasks.filter(t => t.status === 'done');
+
   const columns = [
     { id: 'todo', label: 'To Do', dot: 'bg-blue-500' },
     { id: 'in_progress', label: 'In Progress', dot: 'bg-amber-500' },
@@ -240,7 +282,7 @@ export default function Tasks() {
   ];
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12 h-[calc(100vh-6rem)] flex flex-col">
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
       {/* Header Area */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0">
         <div>
@@ -272,6 +314,47 @@ export default function Tasks() {
         </div>
       </div>
 
+      {isHR && pendingAssignments.length > 0 && (
+        <div className="rounded-3xl border border-pink-100 dark:border-pink-900/40 bg-white dark:bg-gray-950 shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-2xl bg-pink-50 dark:bg-pink-950/30 flex items-center justify-center">
+                <Bell className="h-5 w-5 text-pink-600 dark:text-pink-400" />
+              </div>
+              <div>
+                <h3 className="font-bold text-gray-900 dark:text-white">New Task Assignments</h3>
+                <p className="text-xs text-gray-500">Accept assigned tasks before they enter your Kanban board.</p>
+              </div>
+            </div>
+            <span className="text-xs font-black bg-pink-50 text-pink-600 dark:bg-pink-950/30 dark:text-pink-400 px-3 py-1 rounded-full">
+              {pendingAssignments.length} Pending
+            </span>
+          </div>
+          <div className="divide-y divide-gray-100 dark:divide-gray-800">
+            {pendingAssignments.map((task) => (
+              <div key={task.id} className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className={cn("px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-widest border", priorityColors[task.priority] || priorityColors.medium)}>
+                      {task.priority || 'medium'}
+                    </span>
+                    <span className="text-xs text-gray-500">Assigned by {task.assigned_by_name || 'Admin'}</span>
+                  </div>
+                  <h4 className="font-bold text-gray-900 dark:text-white">{task.title}</h4>
+                  {task.description && <p className="text-sm text-gray-500 mt-1 line-clamp-2">{task.description}</p>}
+                </div>
+                <Button
+                  onClick={() => handleAcceptAssignment(task.id)}
+                  className="bg-pink-600 hover:bg-pink-700 text-white rounded-xl h-9 px-4 shrink-0"
+                >
+                  <CheckCircle className="h-4 w-4 mr-2" /> Accept Task
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Kanban Grid */}
       {loading ? (
         <div className="flex justify-center items-center flex-1 text-gray-500 gap-3">
@@ -279,9 +362,10 @@ export default function Tasks() {
           <span className="font-semibold text-sm tracking-wide">Loading Kanban board...</span>
         </div>
       ) : (
-        <div className="flex-1 grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-4 items-start min-h-0 overflow-hidden pb-4">
+        <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-4 items-start pb-4">
           {columns.map((col) => {
-            const colTasks = filteredTasks.filter(t => t.status === col.id);
+            const actualTasksCount = filteredTasks.filter(t => t.status === col.id).length;
+            const colTasks = col.id === 'done' ? [] : filteredTasks.filter(t => t.status === col.id);
             return (
               <div 
                 key={col.id}
@@ -289,7 +373,7 @@ export default function Tasks() {
                 onDragLeave={() => setDraggedOverColumn(null)}
                 onDrop={(e) => handleDrop(e, col.id)}
                 className={cn(
-                  "bg-gray-50/80 dark:bg-gray-900/40 backdrop-blur-sm border rounded-[24px] p-4 flex flex-col h-full max-h-full overflow-hidden transition-all duration-300",
+                  "bg-gray-50/80 dark:bg-gray-900/40 backdrop-blur-sm border rounded-[24px] p-4 flex flex-col h-full min-h-[500px] transition-all duration-300",
                   draggedOverColumn === col.id 
                     ? "border-pink-300 dark:border-pink-800 bg-pink-50/40 dark:bg-pink-950/20 shadow-inner"
                     : "border-gray-200/50 dark:border-gray-800/50 shadow-sm"
@@ -301,7 +385,7 @@ export default function Tasks() {
                     <span className={cn("h-3 w-3 rounded-full shadow-sm", col.dot)} />
                     <h3 className="font-bold text-[15px] text-gray-900 dark:text-white">{col.label}</h3>
                     <span className="bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-xs font-black px-2 py-0.5 rounded-full shadow-sm border border-gray-100 dark:border-gray-700">
-                      {colTasks.length}
+                      {actualTasksCount}
                     </span>
                   </div>
                   {!isEmployee && (
@@ -315,9 +399,14 @@ export default function Tasks() {
                 </div>
 
                 {/* Column Card Stack */}
-                <div className="space-y-3.5 flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700 pb-2 px-1">
-                  {colTasks.length === 0 ? (
-                    <div className="h-32 border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-2xl flex items-center justify-center text-center p-4 text-[13px] font-medium text-gray-400 bg-white/50 dark:bg-gray-950/50">
+                <div className="space-y-3.5 flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700 pb-2 px-1 max-h-[600px]">
+                  {col.id === 'done' ? (
+                    <div className="h-full min-h-[250px] border-2 border-dashed border-emerald-200 dark:border-emerald-900/40 rounded-3xl flex flex-col items-center justify-center text-center p-6 text-[12px] font-medium text-gray-450 bg-white/50 dark:bg-gray-950/30">
+                      <CheckCircle className="h-8 w-8 mb-2 text-emerald-500 animate-pulse" />
+                      <span className="font-bold text-gray-700 dark:text-gray-300">Drop here to complete</span>
+                    </div>
+                  ) : colTasks.length === 0 ? (
+                    <div className="h-32 border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-2xl flex items-center justify-center text-center p-4 text-[13px] font-medium text-gray-450 bg-white/50 dark:bg-gray-950/50">
                       Drop tasks here
                     </div>
                   ) : (
@@ -400,6 +489,55 @@ export default function Tasks() {
                               </div>
                             </div>
                           </div>
+
+                          {/* HR Assignment Delegation Quick-Action */}
+                          {user?.role === 'hr' && task.assigned_to === currentEmployee?.id && reportedEmployees.length > 0 && (
+                            <div className="mt-3 pt-2.5 border-t border-gray-150 dark:border-gray-850 flex items-center justify-end" onClick={e => e.stopPropagation()}>
+                              {assigningTaskId === task.id ? (
+                                <div className="flex items-center gap-2 w-full justify-between">
+                                  <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Select Employee:</span>
+                                  <div className="flex items-center gap-1.5">
+                                    <select
+                                      autoFocus
+                                      onChange={async (e) => {
+                                        const empId = e.target.value;
+                                        if (!empId) return;
+                                        try {
+                                          await apiClient.put(`/tasks/${task.id}`, { assigned_to: empId });
+                                          toast.success('Task successfully delegated');
+                                          setAssigningTaskId(null);
+                                          fetchData();
+                                        } catch {
+                                          toast.error('Failed to delegate task');
+                                        }
+                                      }}
+                                      className="text-[11px] bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg px-2 py-1 focus:ring-1 focus:ring-pink-500 focus:outline-none font-medium max-w-[120px]"
+                                    >
+                                      <option value="">Choose...</option>
+                                      {reportedEmployees.map((emp) => (
+                                        <option key={emp.id} value={emp.id}>{emp.name}</option>
+                                      ))}
+                                    </select>
+                                    <button 
+                                      onClick={() => setAssigningTaskId(null)}
+                                      className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1"
+                                    >
+                                      <X className="h-3.5 w-3.5" />
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => setAssigningTaskId(task.id)}
+                                  className="text-[11px] font-bold text-pink-600 hover:text-pink-700 hover:bg-pink-50 dark:hover:bg-pink-950/20 px-3 py-1.5 h-auto rounded-xl flex items-center gap-1 border border-pink-100 dark:border-pink-900/30"
+                                >
+                                  <Plus className="h-3.5 w-3.5" /> Assign Task
+                                </Button>
+                              )}
+                            </div>
+                          )}
                         </div>
                       );
                     })
@@ -410,6 +548,86 @@ export default function Tasks() {
           })}
         </div>
       )}
+
+      {/* Completed Tasks Section */}
+      <div className="bg-white dark:bg-gray-950 rounded-3xl border border-gray-150 dark:border-gray-850 shadow-sm overflow-hidden p-6 mt-8">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-emerald-500" />
+              Completed Tasks
+            </h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">List of all successfully completed tasks.</p>
+          </div>
+          <span className="text-xs font-semibold bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400 px-3 py-1 rounded-full border border-emerald-100 dark:border-emerald-900/50">
+            {completedTasks.length} Completed
+          </span>
+        </div>
+
+        {completedTasks.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 text-center border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-2xl bg-gray-50/20 dark:bg-gray-950/10">
+            <CheckCircle className="h-10 w-10 text-gray-300 mb-3 animate-pulse" />
+            <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300">No completed tasks yet</h4>
+            <p className="text-xs text-gray-500 mt-1">Tasks will appear here once marked as Done.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left border-collapse">
+              <thead className="text-[10px] text-gray-550 uppercase bg-gray-50/50 dark:bg-gray-900/50 border-b border-gray-150 dark:border-gray-800">
+                <tr>
+                  <th className="px-6 py-4 font-semibold tracking-wider">Task Title</th>
+                  <th className="px-6 py-4 font-semibold tracking-wider">Category</th>
+                  <th className="px-6 py-4 font-semibold tracking-wider">Assignee</th>
+                  <th className="px-6 py-4 font-semibold tracking-wider">Priority</th>
+                  <th className="px-6 py-4 font-semibold tracking-wider">Due Date</th>
+                  <th className="px-6 py-4 font-semibold tracking-wider">Completion Date</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                {completedTasks.map((task) => {
+                  const avatar = getEmployeeAvatar(task.assigned_to);
+                  const priorityColor = priorityColors[task.priority] || priorityColors.medium;
+                  const categoryColor = categoryColors[task.linked_type || 'Design'] || categoryColors.Design;
+                  return (
+                    <tr 
+                      key={task.id} 
+                      onClick={() => openDialog(task)}
+                      className="hover:bg-gray-50/50 dark:hover:bg-gray-900/50 transition-colors cursor-pointer"
+                    >
+                      <td className="px-6 py-4 font-medium text-gray-900 dark:text-white max-w-xs truncate">{task.title}</td>
+                      <td className="px-6 py-4">
+                        <span className={cn("px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-widest border", categoryColor)}>
+                          {task.linked_type || 'Design'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <Avatar className="h-6 w-6">
+                            {avatar.avatar_url && <AvatarImage src={avatar.avatar_url} alt="Profile" className="object-cover" />}
+                            <AvatarFallback className={cn("text-[9px] font-black", avatar.color)}>
+                              {avatar.initials}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                            {avatar.name}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={cn("px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-widest border", priorityColor)}>
+                          {task.priority === 'high' ? 'High' : task.priority === 'low' ? 'Low' : 'Med'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-gray-500">{task.due_date ? new Date(task.due_date).toLocaleDateString() : '—'}</td>
+                      <td className="px-6 py-4 text-gray-500">{task.updated_at ? new Date(task.updated_at).toLocaleDateString() : '—'}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       {/* Slide-over or Modal Dialog for Add/Edit */}
       <FormDrawer
@@ -439,7 +657,7 @@ export default function Tasks() {
         <FormField label="Assigned To">
           <select value={assignedTo} onChange={(e) => setAssignedTo(e.target.value)} disabled={isEmployee} className={selectClass}>
             <option value="">Unassigned</option>
-            {employees.map((emp) => (
+            {assignableEmployees.map((emp) => (
               <option key={emp.id} value={emp.id}>{emp.name} ({emp.role})</option>
             ))}
           </select>

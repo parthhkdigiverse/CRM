@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Trash2 } from 'lucide-react';
 import { apiClient } from '@/lib/axios';
 import { toast } from 'sonner';
-import FormDrawer, { FormField, ChipSelect, inputClass, selectClass, textareaClass } from '@/components/FormDrawer';
+import FormDrawer, { FormField, ChipSelect, inputClass, textareaClass } from '@/components/FormDrawer';
 import MoreDetails from '@/components/MoreDetails';
 
 interface EditLeadDialogProps {
@@ -31,21 +31,12 @@ const sources = [
   { value: 'event', label: 'Event' },
 ];
 
-const statuses = [
-  { value: 'new', label: 'New' },
-  { value: 'qualified', label: 'Qualified' },
-  { value: 'in_process', label: 'In Process' },
-  { value: 'converted', label: 'Converted' },
-];
-
 export default function EditLeadDialog({ open, onOpenChange, lead, onLeadUpdated }: EditLeadDialogProps) {
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
     name: '', phone: '', source: 'web', status: 'new',
     email: '', company: '', value: '', job_title: '', address: '',
   });
-  const [employees, setEmployees] = useState<any[]>([]);
-
   useEffect(() => {
     if (lead && open) {
       setForm({
@@ -60,12 +51,6 @@ export default function EditLeadDialog({ open, onOpenChange, lead, onLeadUpdated
         address: lead.address || '',
       });
     }
-
-    if (open) {
-      apiClient.get('/employees?per_page=100').then((res) => {
-        setEmployees(res.data.data || []);
-      }).catch(console.error);
-    }
   }, [lead, open]);
 
   const u = (field: string, value: string) => setForm((p) => ({ ...p, [field]: value }));
@@ -77,10 +62,6 @@ export default function EditLeadDialog({ open, onOpenChange, lead, onLeadUpdated
     return ['website', 'whatsapp', 'instagram', 'facebook', 'google_ads', 'meta_ads', 'referral', 'cold_call'].includes(s.value);
   });
 
-  const visibleStatuses = statuses.filter(s => {
-    if (s.value === form.status) return true;
-    return ['new', 'qualified', 'in_process', 'converted'].includes(s.value);
-  });
 
   const handleSave = async () => {
     if (!form.name.trim()) return toast.error('Lead Name is required');
@@ -97,6 +78,7 @@ export default function EditLeadDialog({ open, onOpenChange, lead, onLeadUpdated
       if (form.company.trim()) payload.company = form.company.trim();
       if (form.job_title.trim()) payload.job_title = form.job_title.trim();
       payload.value = parseFloat(form.value) || 0;
+      payload.address = form.address.trim() || null;
 
       await apiClient.put(`/leads/${lead.id}`, payload);
       toast.success('Lead updated successfully');

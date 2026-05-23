@@ -51,10 +51,53 @@ export default function Projects() {
 
   const [projects, setProjects] = useState<any[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
+  const [invoices, setInvoices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [draggedOverColumn, setDraggedOverColumn] = useState<string | null>(null);
+
+  const columns = [
+    { id: 'planning', label: 'Planning', dot: 'bg-sky-500' },
+    { id: 'in_process', label: 'In Process', dot: 'bg-emerald-500' },
+    { id: 'testing', label: 'Testing', dot: 'bg-amber-500' },
+    { id: 'completed', label: 'Completed', dot: 'bg-blue-500' }
+  ];
+
+  const handleDragStart = (e: React.DragEvent, projectId: string) => {
+    e.dataTransfer.setData('text/plain', projectId);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent, targetStatus: string) => {
+    e.preventDefault();
+    setDraggedOverColumn(targetStatus);
+  };
+
+  const handleDrop = async (e: React.DragEvent, targetStatus: string) => {
+    e.preventDefault();
+    setDraggedOverColumn(null);
+    const projectId = e.dataTransfer.getData('text/plain');
+    if (!projectId) return;
+
+    if (targetStatus === 'completed') {
+      const confirm = window.confirm('Are you sure you want to complete this project?');
+      if (!confirm) return;
+    }
+
+    // Optimistically update status
+    const originalProjects = [...projects];
+    setProjects(prev => prev.map(p => p.id === projectId ? { ...p, status: targetStatus } : p));
+
+    try {
+      await apiClient.put(`/projects/${projectId}`, { status: targetStatus });
+      toast.success(`Project status updated successfully`);
+      await fetchData();
+    } catch (err: any) {
+      toast.error('Failed to update project status');
+      setProjects(originalProjects);
+    }
+  };
 
   // Form states
   const [selectedProject, setSelectedProject] = useState<any | null>(null);
@@ -78,7 +121,7 @@ export default function Projects() {
       // Fetch projects (required)
       try {
         const projectsRes = await apiClient.get('/projects');
-        setProjects(projectsRes.data.data || []);
+        setProjects(projectsRes.data.data.data || []);
       } catch (e) {
         console.error('Failed to load projects:', e);
       }
@@ -97,6 +140,14 @@ export default function Projects() {
         setLeads(leadsRes.data.data || []);
       } catch (e) {
         console.warn('Failed to load leads:', e);
+      }
+
+      // Fetch invoices (might fail due to RBAC)
+      try {
+        const invoicesRes = await apiClient.get('/invoices?per_page=100');
+        setInvoices(invoicesRes.data.data || []);
+      } catch (e) {
+        console.warn('Failed to load invoices:', e);
       }
 
     } catch (error) {
@@ -208,9 +259,11 @@ export default function Projects() {
     const matchesSearch = p.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           (p.client_name && p.client_name.toLowerCase().includes(searchQuery.toLowerCase())) ||
                           p.project_code.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || p.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    return matchesSearch;
   });
+
+  // Completed projects list
+  const completedProjects = filteredProjects.filter(p => p.status === 'completed');
 
   // Count summaries
   const totalCount = projects.length;
@@ -304,33 +357,13 @@ export default function Projects() {
         </Card>
       </div>
 
-      {/* Filter Tabs & Controls */}
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-gray-200/50 dark:border-gray-800/50 pb-2">
-        <div className="flex gap-2">
-          {['all', 'planning', 'in_process', 'testing', 'completed'].map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setStatusFilter(tab)}
-              className={cn(
-                "px-3 py-1.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all duration-200",
-                statusFilter === tab
-                  ? "bg-purple-600 text-white shadow-sm"
-                  : "bg-transparent text-gray-500 hover:text-gray-900 dark:hover:text-gray-100"
-              )}
-            >
-              {tab.replace('_', ' ')}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Projects Grid */}
+      {/* Projects Kanban Board */}
       {loading ? (
         <div className="flex justify-center items-center py-32 text-gray-500 gap-3">
           <Loader2 className="h-6 w-6 animate-spin text-indigo-600" />
           <span className="font-semibold text-sm tracking-wide">Loading Projects...</span>
         </div>
-      ) : filteredProjects.length === 0 ? (
+      ) : projects.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-center bg-white dark:bg-gray-950 rounded-3xl border border-dashed border-gray-200 dark:border-gray-800">
           <div className="h-16 w-16 bg-gray-50 dark:bg-gray-900 rounded-full flex items-center justify-center mb-4">
             <Folder className="h-8 w-8 text-gray-400" />
@@ -344,116 +377,215 @@ export default function Projects() {
           )}
         </div>
       ) : (
-        <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-          {filteredProjects.map((project) => {
-            const statusCfg = statusConfigs[project.status] || statusConfigs.planning;
+        <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-4 items-start pb-4">
+          {columns.map((col) => {
+            const actualProjectsCount = filteredProjects.filter(p => p.status === col.id).length;
+            const colProjects = col.id === 'completed' ? [] : filteredProjects.filter(p => p.status === col.id);
             return (
-              <div
-                key={project.id}
-                onClick={() => openDialog(project)}
-                className="bg-white dark:bg-gray-950 border border-gray-100 dark:border-gray-900 rounded-3xl p-6 shadow-sm hover:shadow-xl hover:shadow-indigo-500/5 hover:-translate-y-1 hover:border-indigo-200 dark:hover:border-indigo-900 cursor-pointer transition-all duration-300 group relative overflow-hidden"
+              <div 
+                key={col.id}
+                onDragOver={(e) => handleDragOver(e, col.id)}
+                onDragLeave={() => setDraggedOverColumn(null)}
+                onDrop={(e) => handleDrop(e, col.id)}
+                className={cn(
+                  "bg-gray-50/50 dark:bg-gray-900/10 border rounded-[24px] p-4 flex flex-col h-full min-h-[500px] transition-all duration-300",
+                  draggedOverColumn === col.id 
+                    ? "border-indigo-300 dark:border-indigo-850 bg-indigo-50/20 dark:bg-indigo-950/10 shadow-inner"
+                    : "border-gray-200/50 dark:border-gray-800/50 shadow-sm"
+                )}
               >
-                {/* Subtle glass gradient on hover */}
-                <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
-
-                {/* Trash Action */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDelete(project.id);
-                  }}
-                  className="absolute top-5 right-5 h-8 w-8 rounded-xl hover:bg-rose-50 dark:hover:bg-rose-950/30 flex items-center justify-center text-gray-300 group-hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all duration-200 z-10"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-
-                {/* Card Top: Code and Status */}
-                <div className="flex items-center justify-between mb-5 relative z-10">
-                  <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-900 px-2.5 py-1 rounded-lg border border-gray-200 dark:border-gray-800">
-                    <Folder className="h-3 w-3 text-gray-400" />
-                    <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">{project.project_code}</span>
-                  </div>
-                  <span className={cn("px-2.5 py-1 rounded-md text-[10px] font-extrabold uppercase tracking-wider border", statusCfg.color)}>
-                    {statusCfg.label}
-                  </span>
-                </div>
-
-                {/* Card Main: Title & Client */}
-                <div className="mb-6 relative z-10">
-                  <h3 className="text-lg font-bold text-gray-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors leading-tight">
-                    {project.title}
-                  </h3>
-                  <div className="flex items-center gap-1.5 mt-2">
-                    <div className="h-1.5 w-1.5 rounded-full bg-gray-300 dark:bg-gray-700" />
-                    <p className="text-xs text-gray-500 font-semibold">{project.client_name || 'Internal Project'}</p>
-                  </div>
-                </div>
-
-                {/* Progress Slider */}
-                <div className="space-y-2 mb-6 relative z-10">
-                  <div className="flex justify-between items-end">
-                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Progress</span>
-                    <span className="text-xs font-black text-gray-700 dark:text-gray-300">{project.progress}%</span>
-                  </div>
-                  <div className="w-full h-2.5 bg-gray-100 dark:bg-gray-900 rounded-full overflow-hidden shadow-inner">
-                    <div 
-                      className="h-full bg-gradient-to-r from-indigo-500 via-blue-500 to-sky-400 rounded-full shadow-[0_0_10px_rgba(99,102,241,0.5)]"
-                      style={{ width: `${project.progress}%` }}
-                    />
-                  </div>
-                </div>
-
-                {/* Card Footer: Assignee Stack & Info */}
-                <div className="flex items-center justify-between pt-5 border-t border-gray-100 dark:border-gray-900/50 relative z-10">
-                  {/* Assignee Avatar Initials Stack */}
-                  <div className="flex -space-x-2 overflow-hidden hover:-space-x-1 transition-all duration-300 p-1">
-                    {project.assignee_ids.length === 0 ? (
-                      <span className="text-[10px] text-gray-400 font-medium px-1">Unassigned</span>
-                    ) : (
-                      project.assignee_ids.slice(0, 3).map((aid: string, idx: number) => {
-                        const emp = employees.find(e => e.id === aid);
-                        const name = emp ? emp.name : 'User';
-                        const initials = name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase();
-                        const colors = [
-                          'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300',
-                          'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
-                          'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300'
-                        ];
-                        return (
-                          <Avatar key={aid} className="h-8 w-8 border-2 border-white dark:border-gray-950 ring-2 ring-transparent group-hover:ring-indigo-100 dark:group-hover:ring-indigo-900/50 transition-all shadow-sm">
-                            {emp?.avatar_url && <AvatarImage src={emp.avatar_url} alt="Profile" className="object-cover" />}
-                            <AvatarFallback className={cn("text-[10px] font-black tracking-tighter", colors[idx % colors.length])}>
-                              {initials}
-                            </AvatarFallback>
-                          </Avatar>
-                        );
-                      })
-                    )}
-                    {project.assignee_ids.length > 3 && (
-                      <div className="h-8 w-8 rounded-full bg-gray-100 dark:bg-gray-900 border-2 border-white dark:border-gray-950 flex items-center justify-center text-[10px] font-black text-gray-500 shadow-sm z-10 relative">
-                        +{project.assignee_ids.length - 3}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Date & Cost details */}
-                  <div className="flex flex-col items-end gap-1">
-                    <span className="text-sm text-gray-900 dark:text-gray-100 font-black tracking-tight">
-                      {formatINRCompact(project.budget || 0)}
+                {/* Column Header */}
+                <div className="flex items-center justify-between mb-4 px-2">
+                  <div className="flex items-center gap-2.5">
+                    <span className={cn("h-3 w-3 rounded-full shadow-sm", col.dot)} />
+                    <h3 className="font-bold text-[14px] text-gray-900 dark:text-white">{col.label}</h3>
+                    <span className="bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-xs font-black px-2 py-0.5 rounded-full shadow-sm border border-gray-100 dark:border-gray-700">
+                      {actualProjectsCount}
                     </span>
-                    {project.end_date && (
-                      <span className="flex items-center gap-1 text-[10px] text-gray-400 font-semibold">
-                        <Calendar className="h-3 w-3" />
-                        {new Date(project.end_date).toISOString().split('T')[0]}
-                      </span>
-                    )}
                   </div>
+                </div>
+
+                {/* Cards Container */}
+                <div className="space-y-4 flex-1 overflow-y-auto max-h-[600px] pr-0.5 scrollbar-thin">
+                  {col.id === 'completed' ? (
+                    <div className="h-full min-h-[250px] border-2 border-dashed border-indigo-200 dark:border-indigo-900/40 rounded-3xl flex flex-col items-center justify-center text-center p-6 text-[12px] font-medium text-gray-450 bg-white/50 dark:bg-gray-950/30">
+                      <CheckCircle className="h-8 w-8 mb-2 text-indigo-500 animate-pulse" />
+                      <span className="font-bold text-gray-700 dark:text-gray-300">Drop here to complete</span>
+                      <span className="text-[10px] text-gray-400 dark:text-gray-550 mt-1">Requires confirmation</span>
+                    </div>
+                  ) : colProjects.length === 0 ? (
+                    <div className="h-24 border-2 border-dashed border-gray-200 dark:border-gray-850 rounded-2xl flex items-center justify-center text-center p-4 text-[12px] font-medium text-gray-400 bg-white/50 dark:bg-gray-950/50">
+                      Drop projects here
+                    </div>
+                  ) : (
+                    colProjects.map((project) => {
+                      return (
+                        <div
+                          key={project.id}
+                          draggable
+                          onDragStart={(e) => handleDragStart(e, project.id)}
+                          onClick={() => openDialog(project)}
+                          className="bg-white dark:bg-gray-950 border border-gray-100 dark:border-gray-900 rounded-2xl p-4 shadow-sm hover:shadow-md hover:border-indigo-200 dark:hover:border-indigo-900 cursor-grab active:cursor-grabbing transition-all duration-300 group relative overflow-hidden text-left"
+                        >
+                          {/* Subtle glass gradient on hover */}
+                          <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+
+                          {/* Trash Action */}
+                          {!isEmployee && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(project.id);
+                              }}
+                              className="absolute top-3 right-3 h-7 w-7 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/30 flex items-center justify-center text-gray-300 group-hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all duration-200 z-10"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
+
+                          {/* Card Top: Code */}
+                          <div className="flex items-center justify-between mb-3 relative z-10">
+                            <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-900 px-2 py-0.5 rounded-lg border border-gray-200/60 dark:border-gray-800">
+                              <Folder className="h-3 w-3 text-gray-400" />
+                              <span className="text-[9px] text-gray-500 font-bold uppercase tracking-widest">{project.project_code}</span>
+                            </div>
+                          </div>
+
+                          {/* Card Main: Title & Client */}
+                          <div className="mb-4 relative z-10">
+                            <h4 className="text-sm font-bold text-gray-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors leading-tight line-clamp-2">
+                              {project.title}
+                            </h4>
+                            <p className="text-[11px] text-gray-500 font-semibold mt-1 truncate">{project.client_name || 'Internal Project'}</p>
+                          </div>
+
+
+
+                          {/* Card Footer: Assignee Stack & Info */}
+                          <div className="flex items-center justify-between pt-4 border-t border-gray-100 dark:border-gray-900/50 relative z-10">
+                            {/* Assignee Avatar Initials Stack */}
+                            <div className="flex -space-x-2 overflow-hidden hover:-space-x-1 transition-all duration-300 p-1">
+                              {(project.assignee_ids || []).length === 0 ? (
+                                <span className="text-[9px] text-gray-400 font-medium px-1">Unassigned</span>
+                              ) : (
+                                (project.assignee_ids || []).slice(0, 3).map((aid: string, idx: number) => {
+                                  const emp = employees.find(e => e.id === aid);
+                                  const name = emp ? emp.name : 'User';
+                                  const initials = name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase();
+                                  const colors = [
+                                    'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300',
+                                    'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
+                                    'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300'
+                                  ];
+                                  return (
+                                    <Avatar key={aid} className="h-7 w-7 border-2 border-white dark:border-gray-950 ring-2 ring-transparent group-hover:ring-indigo-100 dark:group-hover:ring-indigo-900/50 transition-all shadow-sm">
+                                      {emp?.avatar_url && <AvatarImage src={emp.avatar_url} alt="Profile" className="object-cover" />}
+                                      <AvatarFallback className={cn("text-[9px] font-black tracking-tighter", colors[idx % colors.length])}>
+                                        {initials}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                  );
+                                })
+                              )}
+                              {(project.assignee_ids || []).length > 3 && (
+                                <div className="h-7 w-7 rounded-full bg-gray-100 dark:bg-gray-900 border-2 border-white dark:border-gray-950 flex items-center justify-center text-[9px] font-black text-gray-500 shadow-sm z-10 relative">
+                                  +{(project.assignee_ids || []).length - 3}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Date & Cost details */}
+                            <div className="flex flex-col items-end gap-0.5">
+                              <span className="text-[11px] text-gray-900 dark:text-gray-100 font-black tracking-tight">
+                                {formatINRCompact(project.budget || 0)}
+                              </span>
+                              {project.end_date && (
+                                <span className="flex items-center gap-0.5 text-[9px] text-gray-400 font-semibold">
+                                  <Calendar className="h-2.5 w-2.5" />
+                                  {new Date(project.end_date).toISOString().split('T')[0]}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
               </div>
             );
           })}
         </div>
       )}
+
+      {/* Completed Projects Section */}
+      <div className="bg-white dark:bg-gray-950 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden p-6 mt-8">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-emerald-500" />
+              Completed Projects
+            </h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Archived client deliveries and internal initiatives.</p>
+          </div>
+          <span className="text-xs font-semibold bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400 px-3 py-1 rounded-full border border-emerald-100 dark:border-emerald-900/50">
+            {completedProjects.length} Completed
+          </span>
+        </div>
+
+        {completedProjects.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 text-center border-2 border-dashed border-gray-100 dark:border-gray-800 rounded-2xl bg-gray-50/20 dark:bg-gray-950/10">
+            <CheckCircle className="h-10 w-10 text-gray-300 mb-3" />
+            <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300">No completed projects yet</h4>
+            <p className="text-xs text-gray-500 mt-1">Drag projects into the Completed column to finish them.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left border-collapse">
+              <thead className="text-[10px] text-gray-550 uppercase bg-gray-50/50 dark:bg-gray-900/50 border-b border-gray-150 dark:border-gray-800">
+                <tr>
+                  <th className="px-6 py-4 font-semibold tracking-wider">Project Code</th>
+                  <th className="px-6 py-4 font-semibold tracking-wider">Project Title</th>
+                  <th className="px-6 py-4 font-semibold tracking-wider">Client / Contact</th>
+                  <th className="px-6 py-4 font-semibold tracking-wider text-right">Budget</th>
+                  <th className="px-6 py-4 font-semibold tracking-wider">Completion Date</th>
+                  <th className="px-6 py-4 font-semibold tracking-wider text-center">Invoice Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                {completedProjects.map((project) => {
+                  const hasInvoice = invoices.some(inv => 
+                    inv.notes && inv.notes.includes(`Project Code: ${project.project_code}`)
+                  );
+                  return (
+                    <tr 
+                      key={project.id} 
+                      onClick={() => openDialog(project)}
+                      className="hover:bg-gray-50/50 dark:hover:bg-gray-900/50 transition-colors cursor-pointer"
+                    >
+                      <td className="px-6 py-4 font-bold text-gray-700 dark:text-gray-300">{project.project_code}</td>
+                      <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">{project.title}</td>
+                      <td className="px-6 py-4 text-gray-500">{project.client_name || 'Internal Project'}</td>
+                      <td className="px-6 py-4 text-right font-bold text-gray-700 dark:text-gray-300">{formatINRCompact(project.budget || 0)}</td>
+                      <td className="px-6 py-4 text-gray-500">{project.updated_at ? new Date(project.updated_at).toLocaleDateString() : 'N/A'}</td>
+                      <td className="px-6 py-4 text-center">
+                        <span className={cn(
+                          "px-2.5 py-1 rounded-full text-[10px] font-bold capitalize border",
+                          hasInvoice 
+                            ? "bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/50" 
+                            : "bg-orange-50 text-orange-600 border-orange-100 dark:bg-orange-950/40 dark:text-orange-400 dark:border-orange-900/50"
+                        )}>
+                          {hasInvoice ? 'Invoiced' : 'Pending Invoice'}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       {/* Project Modal Dialog for Add/Edit */}
       {/* Create / Edit Drawer */}

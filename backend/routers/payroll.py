@@ -10,6 +10,7 @@ from models.payroll import Payroll
 from models.employee import Employee
 from schemas.common import SuccessResponse
 from utils.security import decrypt_field
+from utils.helpers import parse_object_id, paginate_params, build_paginated_response
 from services.audit_service import log_action
 
 router = APIRouter(prefix="/api/v1/payroll", tags=["Payroll"])
@@ -17,6 +18,8 @@ router = APIRouter(prefix="/api/v1/payroll", tags=["Payroll"])
 @router.get("")
 async def get_payrolls(
     month: Optional[str] = None,
+    page: int = Query(1, ge=1),
+    per_page: int = Query(20, ge=1, le=100),
     current_user: User = Depends(get_current_user),
     org: Optional[Organization] = Depends(get_current_org)
 ):
@@ -37,7 +40,9 @@ async def get_payrolls(
             return SuccessResponse(data=[])
         query["employee_id"] = str(emp.id)
         
-    payrolls = await Payroll.find(query).to_list()
+    skip, limit = paginate_params(page, per_page)
+    payrolls = await Payroll.find(query).skip(skip).limit(limit).to_list()
+    total = await Payroll.find(query).count()
     
     result = []
     for p in payrolls:
@@ -64,7 +69,7 @@ async def get_payrolls(
             
         result.append(d)
         
-    return SuccessResponse(data=result)
+    return SuccessResponse(data=build_paginated_response(result, total, page, per_page))
 
 from middleware.rbac import require_module_full
 
@@ -134,7 +139,7 @@ async def update_payroll(
     current_user: User = Depends(require_module_full("payroll")),
     org: Optional[Organization] = Depends(get_current_org)
 ):
-    query = {"_id": PydanticObjectId(payroll_id)}
+    query = {"_id": parse_object_id(payroll_id, "payroll_id")}
     if org:
         query["org_id"] = str(org.id)
         

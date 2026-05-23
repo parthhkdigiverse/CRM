@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { formatINR, formatINRCompact } from '@/lib/currency';
+import { formatINRCompact } from '@/lib/currency';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

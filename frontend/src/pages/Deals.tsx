@@ -46,15 +46,7 @@ interface Company {
   email?: string;
   phone?: string;
   annual_revenue?: number;
-}
-
-interface Contact {
-  id: string;
-  first_name: string;
-  last_name: string;
-  email?: string;
-  phone?: string;
-  company_id?: string;
+  contact_name?: string;
 }
 
 interface Lead {
@@ -65,7 +57,6 @@ interface Lead {
   company?: string;
   source: string;
   status: string;
-  score: number;
   value: number;
   job_title?: string;
   created_at: string;
@@ -101,7 +92,6 @@ export default function Deals() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deals, setDeals] = useState<Deal[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
-  const [contacts, setContacts] = useState<Contact[]>([]);
   const [clientSearch, setClientSearch] = useState('');
   const [loading, setLoading] = useState(true);
   console.log(loading); // Fix TS unused
@@ -115,11 +105,10 @@ export default function Deals() {
   const fetchCRMData = useCallback(async () => {
     setLoading(true);
     try {
-      const [dealsRes, leadsRes, compRes, contRes] = await Promise.all([
+      const [dealsRes, leadsRes, compRes] = await Promise.all([
         apiClient.get('/deals', { params: { per_page: '100' } }),
         apiClient.get('/leads', { params: { per_page: '100' } }),
-        apiClient.get('/companies', { params: { per_page: '100' } }),
-        apiClient.get('/contacts', { params: { per_page: '100' } })
+        apiClient.get('/companies', { params: { per_page: '100' } })
       ]);
 
       const fetchedDeals: Deal[] = dealsRes.data.data || [];
@@ -141,7 +130,7 @@ export default function Deals() {
             value: l.value || 0,
             currency: 'INR',
             stage: dealStage,
-            probability: l.score || 50,
+            probability: 50,
             company_name: l.company || 'Individual Lead',
             contact_name: l.name,
             contact_email: l.email,
@@ -156,7 +145,6 @@ export default function Deals() {
       setDeals(combined);
 
       setCompanies(compRes.data.data || []);
-      setContacts(contRes.data.data || []);
     } catch {
       toast.error('Failed to load CRM data');
     } finally {
@@ -410,7 +398,6 @@ export default function Deals() {
                               phone: deal.contact_phone,
                               company: deal.company_name === 'Individual Lead' ? '' : deal.company_name,
                               value: deal.value,
-                              score: deal.probability,
                               status: deal.stage === 'prospecting' ? 'new' : deal.stage === 'qualification' ? 'contacted' : 'qualified',
                             });
                             setLeadEditDialogOpen(true);
@@ -423,15 +410,17 @@ export default function Deals() {
                         
                         <div className="flex justify-between items-start mb-2 mt-1">
                           <span className="font-bold text-sm text-gray-900 dark:text-gray-100 tracking-tight leading-tight">{deal.title}</span>
-                          <span className={cn("text-[10px] font-bold px-1.5 py-0.5 rounded border capitalize", 
-                            deal.probability >= 80 
-                              ? "bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/30" 
-                              : deal.probability >= 60 
-                                ? "bg-amber-50 text-amber-600 border-amber-100 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900/30" 
-                                : "bg-gray-50 text-gray-600 border-gray-100 dark:bg-gray-950/20 dark:text-gray-400 dark:border-gray-900/30"
-                          )}>
-                            {deal.probability}
-                          </span>
+                          {!deal.isLead && (
+                            <span className={cn("text-[10px] font-bold px-1.5 py-0.5 rounded border capitalize", 
+                              deal.probability >= 80 
+                                ? "bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/30" 
+                                : deal.probability >= 60 
+                                  ? "bg-amber-50 text-amber-600 border-amber-100 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900/30" 
+                                  : "bg-gray-50 text-gray-600 border-gray-100 dark:bg-gray-950/20 dark:text-gray-400 dark:border-gray-900/30"
+                            )}>
+                              {deal.probability}
+                            </span>
+                          )}
                         </div>
                         
                         <p className="text-xs text-gray-400 dark:text-gray-500 font-medium mb-4">{deal.company_name || 'No Company'}</p>

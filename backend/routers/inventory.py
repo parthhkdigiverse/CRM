@@ -1,20 +1,18 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from typing import List
-from beanie import PydanticObjectId
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from models.user import User
 from models.inventory import InventoryProduct
 from schemas.inventory import InventoryProductCreate, InventoryProductUpdate, InventoryProductResponse
 from schemas.common import SuccessResponse
-from middleware.auth_middleware import get_current_user
-from utils.helpers import utc_now
+from middleware.rbac import require_module_read, require_module_write
+from utils.helpers import parse_object_id, paginate_params, build_paginated_response
 
 router = APIRouter(prefix="/api/v1/inventory", tags=["Inventory"])
 
 @router.post("/", response_model=SuccessResponse)
 async def create_product(
     data: InventoryProductCreate,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_module_write("inventory"))
 ):
     if not current_user.org_id:
         raise HTTPException(status_code=400, detail="User does not belong to an organization")
@@ -39,13 +37,19 @@ async def create_product(
     )
 
 @router.get("/", response_model=SuccessResponse)
-async def list_products(current_user: User = Depends(get_current_user)):
+async def list_products(
+    page: int = Query(1, ge=1),
+    per_page: int = Query(20, ge=1, le=100),
+    current_user: User = Depends(require_module_read("inventory"))
+):
     if not current_user.org_id:
         return SuccessResponse(data=[])
         
+    skip, limit = paginate_params(page, per_page)
     products = await InventoryProduct.find(
         InventoryProduct.org_id == str(current_user.org_id)
-    ).sort("-created_at").to_list()
+    ).sort("-created_at").skip(skip).limit(limit).to_list()
+    total = await InventoryProduct.find(InventoryProduct.org_id == str(current_user.org_id)).count()
     
     data = []
     for p in products:
@@ -53,14 +57,14 @@ async def list_products(current_user: User = Depends(get_current_user)):
         p_dict["id"] = str(p.id)
         data.append(InventoryProductResponse(**p_dict).model_dump())
         
-    return SuccessResponse(data=data)
+    return SuccessResponse(data=build_paginated_response(data, total, page, per_page))
 
 @router.delete("/{product_id}", response_model=SuccessResponse)
 async def delete_product(
     product_id: str,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_module_write("inventory"))
 ):
-    product = await InventoryProduct.get(PydanticObjectId(product_id))
+    product = await InventoryProduct.get(parse_object_id(product_id, "product_id"))
     if not product or product.org_id != str(current_user.org_id):
         raise HTTPException(status_code=404, detail="Product not found")
         

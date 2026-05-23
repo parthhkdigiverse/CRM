@@ -13,7 +13,7 @@ from models.organization import Organization
 from models.project import Project
 from schemas.project import ProjectCreate, ProjectUpdate
 from schemas.common import SuccessResponse
-from utils.helpers import utc_now
+from utils.helpers import utc_now, parse_object_id, paginate_params, build_paginated_response
 from services.audit_service import log_action
 
 router = APIRouter(prefix="/api/v1/projects", tags=["Projects"])
@@ -58,6 +58,8 @@ async def create_project(
 @router.get("", response_model=SuccessResponse)
 async def list_projects(
     status: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(20, ge=1, le=100),
     current_user: User = Depends(require_module_read("projects")),
     org: Optional[Organization] = Depends(get_current_org)
 ):
@@ -74,7 +76,9 @@ async def list_projects(
             return SuccessResponse(data=[])
         query["assignee_ids"] = employee.id
 
-    items = await Project.find(query).to_list()
+    skip, limit = paginate_params(page, per_page)
+    items = await Project.find(query).skip(skip).limit(limit).to_list()
+    total = await Project.find(query).count()
     
     # Format return list
     data = []
@@ -87,7 +91,7 @@ async def list_projects(
         if d.get("linked_lead_id"): d["linked_lead_id"] = str(d["linked_lead_id"])
         data.append(d)
 
-    return SuccessResponse(data=data)
+    return SuccessResponse(data=build_paginated_response(data, total, page, per_page))
 
 
 @router.get("/{project_id}", response_model=SuccessResponse)
@@ -96,9 +100,15 @@ async def get_project(
     current_user: User = Depends(require_module_read("projects")),
     org: Optional[Organization] = Depends(get_current_org)
 ):
-    project = await Project.find_one(org_filter(org, {"_id": PydanticObjectId(project_id)}))
+    project = await Project.find_one(org_filter(org, {"_id": parse_object_id(project_id, "project_id")}))
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
+    from middleware.rbac import get_permission
+    if get_permission(current_user.role, "projects") == "own":
+        from models.employee import Employee
+        emp = await Employee.find_one(Employee.user_id == current_user.id, Employee.is_deleted == False)
+        if not emp or emp.id not in project.assignee_ids:
+            raise HTTPException(status_code=403, detail="You can only access projects assigned to you")
 
     d = project.model_dump()
     d["id"] = str(d.pop("_id", project.id))
@@ -109,7 +119,6 @@ async def get_project(
 
     return SuccessResponse(data=d)
 
-
 @router.put("/{project_id}", response_model=SuccessResponse)
 async def update_project(
     project_id: str,
@@ -117,9 +126,11 @@ async def update_project(
     current_user: User = Depends(require_module_write("projects")),
     org: Optional[Organization] = Depends(get_current_org)
 ):
-    project = await Project.find_one(org_filter(org, {"_id": PydanticObjectId(project_id)}))
+    project = await Project.find_one(org_filter(org, {"_id": parse_object_id(project_id, "project_id")}))
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
+
+    old_status = project.status
 
     from middleware.rbac import get_permission
     perm = get_permission(current_user.role, "projects")
@@ -146,7 +157,68 @@ async def update_project(
 
     project.updated_by = current_user.id
     project.updated_at = utc_now()
-    await project.save()
+    await project.save()    # Auto-generate Invoice disabled (moved to interactive frontend creation)
+    # if project.status == "completed" and old_status != "completed":
+    #     try:
+    #         from models.invoice import Invoice, LineItem
+    #         from utils.helpers import generate_invoice_number
+    #         from datetime import datetime
+    #         import logging
+    # 
+    #         # Check if invoice for this project code already exists
+    #         existing_invoice = await Invoice.find_one(
+    #             Invoice.org_id == (project.org_id or org.id),
+    #             Invoice.is_deleted == False,
+    #             {"notes": {"$regex": f"Project Code: {project.project_code}"}}
+    #         )
+    #         if not existing_invoice:
+    #             year = datetime.now().year
+    #             count = await Invoice.find(
+    #                 Invoice.org_id == (project.org_id or org.id),
+    #                 {"invoice_number": {"$regex": f"^INV-{year}-"}}
+    #             ).count()
+    #             inv_number = generate_invoice_number(year, count + 1)
+    #             
+    #             line_item = LineItem(
+    #                 description=f"Project Delivery: {project.title}",
+    #                 quantity=1.0,
+    #                 unit_price=float(project.budget or 0.0),
+    #                 tax_percent=0.0,
+    #                 amount=float(project.budget or 0.0)
+    #             )
+    #             
+    #             invoice = Invoice(
+    #                 org_id=project.org_id or org.id,
+    #                 created_by=current_user.id,
+    #                 invoice_number=inv_number,
+    #                 customer_name=project.client_name or "Internal Client",
+    #                 line_items=[line_item],
+    #                 status="pending",
+    #                 notes=f"Auto-generated upon completion of project. Project Code: {project.project_code}"
+    #             )
+    #             invoice.calculate_totals()
+    #             await invoice.insert()
+    #             await log_action(str(org.id) if org else "super_admin", str(current_user.id), "create", "invoices", str(invoice.id))
+    #     except Exception as e:
+    #         logging.error(f"Failed to auto-generate invoice for project {project.project_code}: {e}", exc_info=True)
+    # Delete associated invoice if status changed from completed to another status
+    if old_status == "completed" and project.status != "completed":
+        try:
+            from models.invoice import Invoice
+            existing_invoice = await Invoice.find_one(
+                Invoice.org_id == (project.org_id or org.id),
+                Invoice.is_deleted == False,
+                {"notes": {"$regex": f"Project Code: {project.project_code}"}}
+            )
+            if existing_invoice:
+                existing_invoice.is_deleted = True
+                existing_invoice.deleted_at = utc_now()
+                existing_invoice.deleted_by = current_user.id
+                await existing_invoice.save()
+                await log_action(str(org.id) if org else "super_admin", str(current_user.id), "delete", "invoices", str(existing_invoice.id))
+        except Exception as e:
+            import logging
+            logging.error(f"Failed to auto-delete invoice for reverted project {project.project_code}: {e}", exc_info=True)
 
     # Sync lead status if linked
     if project.linked_lead_id and "status" in update_data:
@@ -180,7 +252,7 @@ async def delete_project(
     current_user: User = Depends(require_module_full("projects")),
     org: Optional[Organization] = Depends(get_current_org)
 ):
-    project = await Project.find_one(org_filter(org, {"_id": PydanticObjectId(project_id)}))
+    project = await Project.find_one(org_filter(org, {"_id": parse_object_id(project_id, "project_id")}))
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 

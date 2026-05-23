@@ -10,6 +10,7 @@ passlib[bcrypt]
 bcrypt
 httpx
 python-multipart
+python-magic
 bleach
 phonenumbers
 cryptography

@@ -25,17 +25,26 @@ import { apiClient } from '@/lib/axios';
 import NewEmployeeDialog from '@/components/NewEmployeeDialog';
 import { useAuthStore } from '@/store/authStore';
 
+const unwrapList = <T,>(payload: any): T[] => {
+  const data = payload?.data;
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.data)) return data.data;
+  return [];
+};
+
 export default function Employees() {
   const { user } = useAuthStore();
   const [employees, setEmployees] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
 
+  const visibleEmployees = employees.filter(emp => emp.user_id !== user?.id);
+
   const fetchEmployees = useCallback(async () => {
     try {
       setLoading(true);
       const res = await apiClient.get('/employees?per_page=50');
-      setEmployees(res.data.data || []);
+      setEmployees(unwrapList<any>(res.data));
     } catch (error) {
       console.warn('Failed to load employees from API:', error);
     } finally {
@@ -48,13 +57,13 @@ export default function Employees() {
   }, [fetchEmployees]);
 
   // Calculate real-time stats
-  const totalEmployeesCount = employees.length;
-  const activeCount = employees.filter(e => e.status === 'active').length;
-  const onLeaveCount = employees.filter(e => e.status === 'on_leave').length;
+  const totalEmployeesCount = visibleEmployees.length;
+  const activeCount = visibleEmployees.filter(e => e.status === 'active').length;
+  const onLeaveCount = visibleEmployees.filter(e => e.status === 'on_leave').length;
   
   // Find top performer (fallback to first employee or N/A)
-  const topPerformer = employees.length > 0 ? employees[0].name : 'N/A';
-  const topPerformerDept = employees.length > 0 ? employees[0].department || 'Sales' : 'None';
+  const topPerformer = visibleEmployees.length > 0 ? visibleEmployees[0].name : 'N/A';
+  const topPerformerDept = visibleEmployees.length > 0 ? visibleEmployees[0].department || 'Sales' : 'None';
 
   const formatDate = (dateStr: string) => {
     try {
@@ -216,12 +225,12 @@ export default function Employees() {
       <div>
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-bold text-gray-900 dark:text-white">Team Directory</h2>
-          <span className="text-sm font-semibold text-gray-500 bg-gray-100 dark:bg-gray-900 px-3 py-1 rounded-full">{employees.length} members</span>
+          <span className="text-sm font-semibold text-gray-500 bg-gray-100 dark:bg-gray-900 px-3 py-1 rounded-full">{visibleEmployees.length} members</span>
         </div>
 
         {loading ? (
           <div className="flex justify-center py-20 text-gray-500">Loading Directory...</div>
-        ) : employees.length === 0 ? (
+        ) : visibleEmployees.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center bg-white dark:bg-gray-950 rounded-2xl border border-dashed border-gray-200 dark:border-gray-800">
             <Inbox className="h-12 w-12 text-gray-300 mb-4" />
             <h3 className="text-lg font-bold text-gray-900 dark:text-white">No employees found</h3>
@@ -232,7 +241,7 @@ export default function Employees() {
           </div>
         ) : (
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {employees.map((emp) => {
+            {visibleEmployees.map((emp) => {
               const initials = emp.name ? emp.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : 'EM';
               const isLeave = emp.status === 'on_leave';
               const colorClass = getInitialsColor(emp.name);

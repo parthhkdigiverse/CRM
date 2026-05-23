@@ -47,7 +47,7 @@ export default function Documents() {
     try {
       setLoading(true);
       const res = await apiClient.get('/documents');
-      setDocuments(res.data.data || []);
+      setDocuments(res.data.data.data || []);
     } catch (err) {
       console.warn('Failed to load documents list:', err);
     } finally {
@@ -136,8 +136,8 @@ export default function Documents() {
   };
 
   // Convert bytes to formatted string
-  const formatBytes = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes';
+  const formatBytes = (bytes: number | null | undefined) => {
+    if (!bytes || isNaN(bytes) || bytes === 0) return '0 Bytes';
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
@@ -149,7 +149,7 @@ export default function Documents() {
   const formattedStorageUsed = formatBytes(totalBytesUsed);
 
   // Calculate unique folders containing files
-  const foldersCount = new Set(documents.map(d => d.folder.toLowerCase())).size;
+  const foldersCount = new Set(documents.map(d => (d.folder || 'General').toLowerCase())).size;
 
   // Calculate shared files count
   const sharedCount = documents.filter(d => d.is_shared).length;
@@ -180,9 +180,13 @@ export default function Documents() {
 
   // Filtered list
   const filteredDocs = documents.filter(doc => {
-    const matchesSearch = doc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          doc.uploaded_by_name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesFolder = selectedFolder === 'All' || doc.folder.toLowerCase() === selectedFolder.toLowerCase();
+    const docName = doc.name || '';
+    const uploadedByName = doc.uploaded_by_name || '';
+    const docFolder = doc.folder || 'General';
+    
+    const matchesSearch = docName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          uploadedByName.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesFolder = selectedFolder === 'All' || docFolder.toLowerCase() === selectedFolder.toLowerCase();
     return matchesSearch && matchesFolder;
   });
 

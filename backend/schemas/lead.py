@@ -20,6 +20,7 @@ class LeadCreate(BaseModel):
     assigned_to: Optional[str] = None
     follow_up_date: Optional[datetime] = None
     notes: Optional[str] = None
+    address: Optional[str] = None
 
 
 class LeadUpdate(BaseModel):
@@ -34,6 +35,7 @@ class LeadUpdate(BaseModel):
     assigned_to: Optional[str] = None
     follow_up_date: Optional[datetime] = None
     notes: Optional[str] = None
+    address: Optional[str] = None
 
 
 class LeadResponse(BaseModel):
@@ -44,13 +46,12 @@ class LeadResponse(BaseModel):
     company: Optional[str] = None
     source: str
     status: str
-    score: int
     value: float
     job_title: Optional[str] = None
     assigned_to: Optional[str] = None
     follow_up_date: Optional[datetime] = None
     notes: Optional[str] = None
-    score_history: List[Dict] = []
+    address: Optional[str] = None
     converted_deal_id: Optional[str] = None
     created_at: datetime
     updated_at: datetime

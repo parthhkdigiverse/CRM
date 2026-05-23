@@ -66,6 +66,7 @@ export default function NewLeadDialog({ open, onOpenChange, onLeadCreated }: New
       if (form.company.trim()) payload.company = form.company.trim();
       if (form.job_title.trim()) payload.job_title = form.job_title.trim();
       if (form.value) payload.value = parseFloat(form.value) || 0;
+      if (form.address.trim()) payload.address = form.address.trim();
 
       await apiClient.post('/leads', payload);
       toast.success('Lead created successfully! 🎉');

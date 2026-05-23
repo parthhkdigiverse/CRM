@@ -8,6 +8,7 @@ import {
 import { cn } from '@/lib/utils';
 import { formatINR } from '@/lib/currency';
 import { toast } from 'sonner';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 
 import { apiClient } from '@/lib/axios';
 import NewInvoiceDialog from '@/components/NewInvoiceDialog';
@@ -19,9 +20,14 @@ const statusColors: Record<string, string> = {
 };
 
 export default function Invoices() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [invoices, setInvoices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null);
+  const [prefillProject, setPrefillProject] = useState<any | null>(null);
+  const [completedProjects, setCompletedProjects] = useState<any[]>([]);
 
   const fetchInvoices = useCallback(async () => {
     try {
@@ -34,9 +40,66 @@ export default function Invoices() {
     }
   }, []);
 
+  const fetchCompletedProjects = useCallback(async () => {
+    try {
+      const res = await apiClient.get('/projects?status=completed');
+      setCompletedProjects(res.data.data.data || []);
+    } catch (e) {
+      console.warn('Failed to load completed projects:', e);
+    }
+  }, []);
+
   useEffect(() => {
     fetchInvoices();
-  }, [fetchInvoices]);
+    fetchCompletedProjects();
+  }, [fetchInvoices, fetchCompletedProjects]);
+
+  useEffect(() => {
+    const projectId = searchParams.get('project_id');
+    if (projectId) {
+      const loadPrefillProject = async () => {
+        try {
+          const res = await apiClient.get(`/projects/${projectId}`);
+          setPrefillProject(res.data.data);
+          setDialogOpen(true);
+        } catch (e) {
+          toast.error('Failed to load project details for invoicing');
+        }
+      };
+      loadPrefillProject();
+    }
+  }, [searchParams]);
+
+  const handleOpenChange = (open: boolean) => {
+    setDialogOpen(open);
+    if (!open) {
+      setSelectedInvoice(null);
+      setPrefillProject(null);
+      if (searchParams.has('project_id')) {
+        searchParams.delete('project_id');
+        setSearchParams(searchParams);
+      }
+    }
+  };
+
+  const handleCreated = () => {
+    fetchInvoices();
+    fetchCompletedProjects();
+    if (searchParams.has('project_id')) {
+      toast.success('Redirecting back to projects...');
+      setTimeout(() => {
+        navigate('/projects');
+      }, 1000);
+    }
+  };
+
+  const pendingProjects = completedProjects.filter(project => {
+    const hasInvoice = invoices.some(inv => 
+      inv.notes && inv.notes.includes(`Project Code: ${project.project_code}`)
+    );
+    return !hasInvoice;
+  });
+
   return (
     <>
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-8">
@@ -79,6 +142,42 @@ export default function Invoices() {
         ))}
       </div>
 
+      {/* Completed Projects Pending Invoicing */}
+      {pendingProjects.length > 0 && (
+        <div className="bg-white dark:bg-gray-950 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 p-5 space-y-4">
+          <div>
+            <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
+              <Clock className="h-5 w-5 text-orange-500 animate-pulse" />
+              Completed Projects Pending Invoicing
+            </h3>
+            <p className="text-xs text-gray-550 dark:text-gray-400 mt-0.5">These projects were marked completed by employees and need invoices generated.</p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {pendingProjects.map((project) => (
+              <div key={project.id} className="border border-gray-100 dark:border-gray-900 rounded-xl p-4 bg-gray-50/50 dark:bg-gray-900/10 flex flex-col justify-between gap-3 shadow-sm hover:shadow-md transition-shadow">
+                <div>
+                  <div className="flex justify-between items-start">
+                    <span className="text-[9px] bg-indigo-50 text-indigo-600 dark:bg-indigo-950/30 dark:text-indigo-400 font-bold px-2 py-0.5 rounded border border-indigo-100 dark:border-indigo-900/50 uppercase tracking-wider">{project.project_code}</span>
+                    <span className="text-xs font-bold text-gray-900 dark:text-white">{formatINR(project.budget || 0)}</span>
+                  </div>
+                  <h4 className="text-sm font-bold text-gray-900 dark:text-white mt-2 line-clamp-1">{project.title}</h4>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">{project.client_name || 'Internal Client'}</p>
+                </div>
+                <Button 
+                  onClick={() => {
+                    setPrefillProject(project);
+                    setDialogOpen(true);
+                  }}
+                  className="w-full bg-purple-600 hover:bg-purple-700 text-white rounded-xl h-8 text-xs font-semibold"
+                >
+                  <Plus className="h-3.5 w-3.5 mr-1" /> Create Invoice
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="bg-white dark:bg-gray-950 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden">
         <div className="p-5 border-b border-gray-100 dark:border-gray-800 flex flex-col sm:flex-row justify-between items-center gap-4">
           <h3 className="font-bold text-gray-900 dark:text-white">All Invoices</h3>
@@ -95,7 +194,7 @@ export default function Invoices() {
               <FileText className="h-10 w-10 text-gray-400 mb-3" />
               <h3 className="text-lg font-bold text-gray-900 dark:text-white">No invoices yet</h3>
               <p className="text-gray-500 max-w-sm mt-1">Create your first invoice to get paid.</p>
-              <Button className="mt-4 bg-purple-600 hover:bg-purple-700 text-white rounded-xl" onClick={() => setDialogOpen(true)}>
+              <Button className="mt-4 bg-purple-600 hover:bg-purple-700 text-white rounded-xl" onClick={() => { setSelectedInvoice(null); setPrefillProject(null); setDialogOpen(true); }}>
                 <Plus className="h-4 w-4 mr-2" /> New Invoice
               </Button>
             </div>
@@ -113,7 +212,14 @@ export default function Invoices() {
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                 {invoices.map((inv, i) => (
-                  <tr key={inv.id || i} className="hover:bg-gray-50/50 dark:hover:bg-gray-900/50 transition-colors cursor-pointer">
+                  <tr 
+                    key={inv.id || i} 
+                    onClick={() => {
+                      setSelectedInvoice(inv);
+                      setDialogOpen(true);
+                    }}
+                    className="hover:bg-gray-50/50 dark:hover:bg-gray-900/50 transition-colors cursor-pointer"
+                  >
                     <td className="px-6 py-4 font-bold text-gray-700 dark:text-gray-300">{inv.invoice_number || `INV-${inv.id.substring(0,6)}`}</td>
                     <td className="px-6 py-4 font-medium text-gray-900 dark:text-gray-100">{inv.customer_name || inv.company_id || inv.contact_id || 'Unknown'}</td>
                     <td className="px-6 py-4 text-right font-bold text-blue-600 dark:text-blue-400">{formatINR(inv.total)}</td>
@@ -130,7 +236,13 @@ export default function Invoices() {
         </div>
       </div>
     </div>
-    <NewInvoiceDialog open={dialogOpen} onOpenChange={setDialogOpen} onCreated={fetchInvoices} />
+    <NewInvoiceDialog 
+      open={dialogOpen} 
+      onOpenChange={handleOpenChange} 
+      onCreated={handleCreated} 
+      invoice={selectedInvoice}
+      prefillProject={prefillProject}
+    />
     </>
   );
 }

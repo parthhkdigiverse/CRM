@@ -15,14 +15,12 @@ import os
 
 from config import settings
 from database import init_db, close_db
+from middleware.security import RequestSecurityMiddleware, SecurityHeadersMiddleware
 from schemas.common import ErrorResponse, ErrorDetail
 from routers import auth, organization, contact, company, lead, deal, invoice, task, employee, ai, attendance, project, meeting, document, audit_log, target, super_admin, payroll, leave, chat, inventory, sale
+from utils.logging import configure_secure_logging, redact
 
-# Setup basic logging to only show warnings and errors
-logging.basicConfig(
-    level=logging.ERROR,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
+configure_secure_logging(logging.INFO if not settings.is_production else logging.WARNING)
 # Suppress noisy library logs specifically, just in case
 logging.getLogger("pymongo").setLevel(logging.ERROR)
 logging.getLogger("uvicorn.access").setLevel(logging.ERROR)
@@ -51,9 +49,12 @@ app = FastAPI(
     openapi_url="/api/openapi.json" if settings.APP_ENV != "production" else None,
 )
 
-# Ensure storage directories exist
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(RequestSecurityMiddleware)
+
+# Serve only validated public avatars. General uploaded documents are never exposed as static files.
 os.makedirs("storage/avatars", exist_ok=True)
-app.mount("/storage", StaticFiles(directory="storage"), name="storage")
+app.mount("/storage/avatars", StaticFiles(directory="storage/avatars"), name="avatars")
 
 # CORS Middleware
 origins = [origin.strip() for origin in settings.ALLOWED_ORIGINS.split(",")]
@@ -61,8 +62,9 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
+    expose_headers=["X-Request-ID", "X-RateLimit-Limit", "X-RateLimit-Remaining"],
 )
 
 
@@ -76,14 +78,14 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         
     error_response = ErrorResponse(
         success=False,
+        request_id=getattr(request.state, "request_id", ""),
         error=ErrorDetail(
             code="VALIDATION_ERROR",
             message="Input validation failed",
             details=errors
         )
     )
-    with open("error.log", "a") as f:
-        f.write(f"VALIDATION ERROR: {errors}\n")
+    logging.warning("Validation error on %s: %s", request.url.path, redact(errors))
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content=error_response.model_dump()
@@ -93,16 +95,18 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     """Fallback exception handler to ensure standard response format."""
-    logging.error(f"Unhandled exception: {exc}", exc_info=True)
+    if settings.is_production:
+        logging.error("Unhandled exception on %s", request.url.path)
+    else:
+        logging.error("Unhandled exception on %s: %s", request.url.path, exc, exc_info=True)
     error_response = ErrorResponse(
         success=False,
+        request_id=getattr(request.state, "request_id", ""),
         error=ErrorDetail(
             code="INTERNAL_SERVER_ERROR",
             message="An unexpected error occurred. Please try again later."
         )
     )
-    with open("error.log", "a") as f:
-        f.write(f"500 ERROR: {exc}\n")
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content=error_response.model_dump()
@@ -142,6 +146,5 @@ async def health_check():
 
 if __name__ == "__main__":
     import uvicorn
-    import os
     port = int(os.getenv("PORT", "8000"))
-    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True, access_log=False)
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=not settings.is_production, access_log=False)

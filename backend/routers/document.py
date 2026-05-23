@@ -3,25 +3,27 @@ Document router endpoints — file upload, list, download, and delete.
 """
 
 import os
-from datetime import datetime
-from typing import List, Optional
+import asyncio
+import secrets
+import re
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
 from fastapi.responses import FileResponse
-from beanie import PydanticObjectId
 
-from middleware.auth_middleware import get_current_user, get_current_org, org_filter
-from middleware.rbac import require_module_read, require_module_write, require_module_full
+from middleware.auth_middleware import get_current_org, org_filter
+from middleware.rbac import require_module_read, require_module_write
 from models.user import User
 from models.organization import Organization
 from models.document import DocumentModel
 from models.employee import Employee
 from schemas.common import SuccessResponse
-from utils.helpers import utc_now
+from utils.helpers import utc_now, parse_object_id, escape_regex, paginate_params, build_paginated_response
+from utils.file_validation import validate_upload
 from services.audit_service import log_action
 
 router = APIRouter(prefix="/api/v1/documents", tags=["Documents"])
 
-STORAGE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "storage")
+STORAGE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "storage", "documents")
 os.makedirs(STORAGE_DIR, exist_ok=True)
 
 
@@ -33,8 +35,9 @@ async def upload_document(
     current_user: User = Depends(require_module_write("documents")),
     org: Optional[Organization] = Depends(get_current_org)
 ):
-    # Determine safe filename
-    filename = os.path.basename(file.filename)
+    upload = await validate_upload(file)
+    filename = upload.filename
+    safe_folder = re.sub(r"[^A-Za-z0-9 _-]+", "_", (folder or "General").strip())[:60] or "General"
     
     # Check current user employee details to get their name
     uploaded_by_name = current_user.full_name or current_user.email
@@ -43,9 +46,11 @@ async def upload_document(
         uploaded_by_name = emp.name
 
     # Generate unique storage filename
-    unique_id = str(PydanticObjectId())
-    storage_filename = f"{unique_id}_{filename}"
+    unique_id = secrets.token_hex(16)
+    storage_filename = f"{unique_id}.{upload.extension}"
     file_path = os.path.join(STORAGE_DIR, storage_filename)
+    if not os.path.abspath(file_path).startswith(os.path.abspath(STORAGE_DIR)):
+        raise HTTPException(status_code=400, detail="Invalid storage path")
 
     # Save file contents locally
     size_bytes = 0
@@ -54,18 +59,22 @@ async def upload_document(
             while content := await file.read(1024 * 1024):  # 1MB chunks
                 f.write(content)
                 size_bytes += len(content)
+                if size_bytes > upload.size_bytes:
+                    raise HTTPException(status_code=413, detail="Uploaded file is too large")
     except Exception as e:
         if os.path.exists(file_path):
-            os.remove(file_path)
-        raise HTTPException(status_code=500, detail=f"Failed to save file: {str(e)}")
+            await asyncio.to_thread(os.remove, file_path)
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(status_code=500, detail="Failed to save file")
 
     # Insert Beanie document record
     doc = DocumentModel(
         name=filename,
-        folder=folder,
+        folder=safe_folder,
         size_bytes=size_bytes,
         file_path=file_path,
-        mime_type=file.content_type,
+        mime_type=upload.mime_type,
         org_id=org.id if org else None,
         uploaded_by=current_user.id,
         uploaded_by_name=uploaded_by_name,
@@ -92,6 +101,8 @@ async def upload_document(
 async def list_documents(
     folder: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(20, ge=1, le=100),
     current_user: User = Depends(require_module_read("documents")),
     org: Optional[Organization] = Depends(get_current_org)
 ):
@@ -99,10 +110,10 @@ async def list_documents(
     
     if folder and folder.lower() != "all":
         # Case insensitive match for folders e.g. HR, Sales, Finance
-        query["folder"] = {"$regex": f"^{folder}$", "$options": "i"}
+        query["folder"] = {"$regex": f"^{escape_regex(folder)}$", "$options": "i"}
 
     if search:
-        query["name"] = {"$regex": search, "$options": "i"}
+        query["name"] = {"$regex": escape_regex(search), "$options": "i"}
 
     # Employees can only see their own documents or shared documents
     if current_user.role == "employee":
@@ -111,7 +122,9 @@ async def list_documents(
             {"is_shared": True}
         ]
 
-    docs = await DocumentModel.find(query).sort("-uploaded_at").to_list()
+    skip, limit = paginate_params(page, per_page)
+    docs = await DocumentModel.find(query).sort("-uploaded_at").skip(skip).limit(limit).to_list()
+    total = await DocumentModel.find(query).count()
 
     data = []
     for doc in docs:
@@ -122,7 +135,7 @@ async def list_documents(
         d["uploaded_at"] = doc.uploaded_at.isoformat()
         data.append(d)
 
-    return SuccessResponse(data=data)
+    return SuccessResponse(data=build_paginated_response(data, total, page, per_page))
 
 
 @router.get("/{document_id}/download")
@@ -131,11 +144,14 @@ async def download_document(
     current_user: User = Depends(require_module_read("documents")),
     org: Optional[Organization] = Depends(get_current_org)
 ):
+    object_id = parse_object_id(document_id, "document_id")
     doc = await DocumentModel.find_one(
-        org_filter(org, {"_id": PydanticObjectId(document_id)})
+        org_filter(org, {"_id": object_id})
     )
     if not doc or not os.path.exists(doc.file_path):
         raise HTTPException(status_code=404, detail="Document not found or missing on disk")
+    if current_user.role == "employee" and str(doc.uploaded_by) != str(current_user.id) and not doc.is_shared:
+        raise HTTPException(status_code=403, detail="You can only download your own or shared documents")
 
     return FileResponse(
         path=doc.file_path,
@@ -150,8 +166,9 @@ async def delete_document(
     current_user: User = Depends(require_module_write("documents")),
     org: Optional[Organization] = Depends(get_current_org)
 ):
+    object_id = parse_object_id(document_id, "document_id")
     doc = await DocumentModel.find_one(
-        org_filter(org, {"_id": PydanticObjectId(document_id)})
+        org_filter(org, {"_id": object_id})
     )
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
@@ -168,8 +185,8 @@ async def delete_document(
     # Try to delete local file from storage
     try:
         if os.path.exists(doc.file_path):
-            os.remove(doc.file_path)
+            await asyncio.to_thread(os.remove, doc.file_path)
     except Exception as e:
-        print(f"Warning: Failed to clean up file {doc.file_path}: {e}")
+        pass
 
     return SuccessResponse(message="Document deleted successfully")

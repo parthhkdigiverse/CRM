@@ -3,6 +3,7 @@ import { Input } from '@/components/ui/input';
 import { apiClient } from '@/lib/axios';
 import { toast } from 'sonner';
 import FormDrawer, { FormField, selectClass, inputClass, textareaClass } from '@/components/FormDrawer';
+import { useAuthStore } from '@/store/authStore';
 
 interface ConvertLeadDialogProps {
   open: boolean;
@@ -13,6 +14,7 @@ interface ConvertLeadDialogProps {
 }
 
 export default function ConvertLeadDialog({ open, onOpenChange, lead, onLeadConverted, onCancel }: ConvertLeadDialogProps) {
+  const { user } = useAuthStore();
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
     assigned_to: '',
@@ -20,6 +22,19 @@ export default function ConvertLeadDialog({ open, onOpenChange, lead, onLeadConv
     notes: '',
   });
   const [employees, setEmployees] = useState<any[]>([]);
+
+  const currentEmployee = employees.find(emp => emp.user_id === user?.id);
+
+  const filteredEmployees = employees.filter(emp => {
+    if (user?.role === 'hr') {
+      if (!currentEmployee) return false;
+      return emp.reporting_to === currentEmployee.id && emp.id !== currentEmployee.id;
+    }
+    if (user?.role === 'admin' || user?.role === 'super_admin') {
+      return emp.role !== 'hr';
+    }
+    return true;
+  });
 
   useEffect(() => {
     if (open) {
@@ -79,7 +94,7 @@ export default function ConvertLeadDialog({ open, onOpenChange, lead, onLeadConv
       <FormField label="Assign To Project Manager" required>
         <select value={form.assigned_to} onChange={(e) => u('assigned_to', e.target.value)} className={selectClass}>
           <option value="">Select Employee...</option>
-          {employees.map((emp) => (
+          {filteredEmployees.map((emp) => (
             <option key={emp.id} value={emp.id}>
               {emp.name}
             </option>

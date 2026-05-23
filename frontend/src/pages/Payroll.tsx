@@ -64,7 +64,8 @@ export default function Payroll() {
       setLoading(true);
       const res = await apiClient.get('/payroll', { params: { month: monthYear } });
       
-      const formatted = (res.data.data || []).map((p: any) => ({
+      const items = res.data.data?.data || res.data.data || [];
+      const formatted = items.map((p: any) => ({
         id: p.id,
         employee: p.employee,
         month: p.month,

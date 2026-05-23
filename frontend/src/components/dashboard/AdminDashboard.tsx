@@ -26,7 +26,7 @@ import {
 
 import { useAuthStore } from '@/store/authStore';
 import { apiClient } from '@/lib/axios';
-import { formatINRCompact } from '@/lib/currency';
+import { formatINRCompact, formatINR } from '@/lib/currency';
 
 const pieData = [
   { name: 'Sales', value: 400, color: '#8b5cf6' },
@@ -34,6 +34,22 @@ const pieData = [
   { name: 'Support', value: 200, color: '#10b981' },
   { name: 'Operations', value: 100, color: '#f97316' },
 ];
+
+const FinancialTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-3 shadow-xl">
+        <p className="text-sm font-bold text-gray-900 dark:text-white mb-1.5">{label}</p>
+        {payload.map((entry: any, index: number) => (
+          <p key={index} className="text-xs font-semibold" style={{ color: entry.color }}>
+            {entry.name}: {formatINR(entry.value)}
+          </p>
+        ))}
+      </div>
+    );
+  }
+  return null;
+};
 
 export default function AdminDashboard() {
   const { user } = useAuthStore();
@@ -49,56 +65,20 @@ export default function AdminDashboard() {
 
   const [chartData, setChartData] = useState<any[]>([]);
 
-
-
-  const buildChartsData = (invoicesList: any[]) => {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const dataMap: Record<string, { Revenue: number; Expense: number }> = {};
-    
-    // Initialize last 6 months
-    const today = new Date();
-    const last6Months = [];
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
-      const label = months[d.getMonth()];
-      last6Months.push(label);
-      dataMap[label] = { Revenue: 0, Expense: 0 };
-    }
-
-    invoicesList.forEach((inv) => {
-      const date = new Date(inv.created_at || inv.due_date);
-      const label = months[date.getMonth()];
-      if (dataMap[label]) {
-        if (inv.status === 'paid') {
-          dataMap[label].Revenue += inv.total;
-        } else if (inv.status === 'overdue' || inv.status === 'sent') {
-          dataMap[label].Expense += inv.total * 0.15; // Simulated expenses/receivables ratio
-        }
-      }
-    });
-
-    const hasRevenue = Object.values(dataMap).some(d => d.Revenue > 0);
-    const finalData = last6Months.map(name => ({
-      name,
-      Revenue: dataMap[name].Revenue || (hasRevenue ? 0 : Math.floor(Math.random() * 50000 + 10000)),
-      Expense: dataMap[name].Expense || (hasRevenue ? 0 : Math.floor(Math.random() * 20000 + 5000)),
-    }));
-
-    return finalData;
-  };
-
   const fetchDashboardData = useCallback(async () => {
     try {
       setLoading(true);
-      const [leadsRes, dealsRes, invoicesRes] = await Promise.all([
+      const [leadsRes, dealsRes, invoicesRes, reportsRes] = await Promise.all([
         apiClient.get('/leads?per_page=100'),
         apiClient.get('/deals?per_page=100'),
         apiClient.get('/invoices?per_page=100'),
+        apiClient.get('/reports/summary'),
       ]);
 
       const leadsList = leadsRes.data.data || [];
       const dealsList = dealsRes.data.data || [];
       const invoicesList = invoicesRes.data.data || [];
+      const reportsData = reportsRes.data.data || {};
 
       // Calculate Total Revenue (paid invoices total)
       const paidInvoices = invoicesList.filter((inv: any) => inv.status === 'paid');
@@ -135,8 +115,7 @@ export default function AdminDashboard() {
         pendingDues,
       });
 
-      const dynamicAreaData = buildChartsData(invoicesList);
-      setChartData(dynamicAreaData);
+      setChartData(reportsData.financial || []);
 
     } catch (err) {
       console.error('Failed to fetch dashboard data', err);
@@ -274,12 +253,13 @@ export default function AdminDashboard() {
         <Card className="md:col-span-2 min-w-0 border-0 shadow-sm rounded-2xl bg-white dark:bg-gray-950">
           <CardHeader className="p-6 pb-2 flex flex-row items-center justify-between">
             <div>
-              <CardTitle className="text-lg font-bold">Revenue vs Receivables Ratio</CardTitle>
-              <p className="text-xs text-gray-500 mt-1">Based on invoice payments</p>
+              <CardTitle className="text-lg font-bold">Revenue vs Expense vs Profit</CardTitle>
+              <p className="text-xs text-gray-500 mt-1">6-month trend analysis (₹ in thousands)</p>
             </div>
-            <div className="flex items-center gap-4 text-sm">
-               <div className="flex items-center gap-1.5"><div className="h-2 w-2 rounded-full bg-blue-500"></div>Revenue (Paid)</div>
-               <div className="flex items-center gap-1.5"><div className="h-2 w-2 rounded-full bg-orange-500"></div>Receivables</div>
+            <div className="flex items-center gap-4 text-xs font-semibold">
+               <div className="flex items-center gap-1.5"><div className="h-2.5 w-2.5 rounded-full bg-blue-500"></div>Revenue</div>
+               <div className="flex items-center gap-1.5"><div className="h-2.5 w-2.5 rounded-full bg-orange-400"></div>Expense</div>
+               <div className="flex items-center gap-1.5"><div className="h-2.5 w-2.5 rounded-full bg-emerald-500"></div>Profit</div>
             </div>
           </CardHeader>
           <CardContent className="p-6 pt-4">
@@ -287,28 +267,32 @@ export default function AdminDashboard() {
               <ResponsiveContainer width="100%" height={250} minWidth={0} minHeight={250}>
                 <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <defs>
-                    <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2}/>
-                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                    <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.15}/>
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.01}/>
                     </linearGradient>
-                    <linearGradient id="colorExpense" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#f97316" stopOpacity={0.2}/>
-                      <stop offset="95%" stopColor="#f97316" stopOpacity={0}/>
+                    <linearGradient id="colorExp" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#fb923c" stopOpacity={0.15}/>
+                      <stop offset="95%" stopColor="#fb923c" stopOpacity={0.01}/>
+                    </linearGradient>
+                    <linearGradient id="colorProf" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.15}/>
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0.01}/>
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" className="dark:stroke-gray-800" />
-                  <XAxis dataKey="name" stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: 'rgba(255, 255, 255, 0.8)',
-                      border: 'none',
-                      borderRadius: '8px',
-                      boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
-                    }}
+                  <XAxis dataKey="month" stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} />
+                  <YAxis 
+                    stroke="#9ca3af" 
+                    fontSize={12} 
+                    tickLine={false} 
+                    axisLine={false}
+                    tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
                   />
-                  <Area type="monotone" dataKey="Revenue" stroke="#3b82f6" strokeWidth={2} fillOpacity={1} fill="url(#colorRevenue)" />
-                  <Area type="monotone" dataKey="Expense" stroke="#f97316" strokeWidth={2} fillOpacity={1} fill="url(#colorExpense)" />
+                  <Tooltip content={<FinancialTooltip />} />
+                  <Area type="monotone" dataKey="revenue" name="Revenue" stroke="#3b82f6" strokeWidth={2.5} fillOpacity={1} fill="url(#colorRev)" />
+                  <Area type="monotone" dataKey="expense" name="Expense" stroke="#fb923c" strokeWidth={2.5} fillOpacity={1} fill="url(#colorExp)" />
+                  <Area type="monotone" dataKey="profit" name="Profit" stroke="#10b981" strokeWidth={2.5} fillOpacity={1} fill="url(#colorProf)" />
                 </AreaChart>
               </ResponsiveContainer>
             </div>

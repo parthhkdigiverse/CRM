@@ -11,6 +11,7 @@ from middleware.rbac import require_module_read, require_module_write, require_m
 from models.user import User
 from models.organization import Organization
 from models.project import Project
+from models.notification import Notification
 from schemas.project import ProjectCreate, ProjectUpdate
 from schemas.common import SuccessResponse
 from utils.helpers import utc_now, parse_object_id, paginate_params, build_paginated_response
@@ -158,6 +159,54 @@ async def update_project(
     project.updated_by = current_user.id
     project.updated_at = utc_now()
     await project.save()    # Auto-generate Invoice disabled (moved to interactive frontend creation)
+
+    if project.status == "completed" and old_status != "completed":
+        try:
+            org_id = org.id if org else current_user.org_id
+            employee_name = current_user.full_name.strip() or current_user.email
+            
+            # Notify HR
+            hr_users = await User.find(
+                User.org_id == org_id,
+                User.role == "hr",
+                User.is_active == True
+            ).to_list()
+            for u in hr_users:
+                if u.id != current_user.id:
+                    hr_notif = Notification(
+                        org_id=org_id,
+                        user_id=u.id,
+                        created_by=current_user.id,
+                        type="task_assigned",
+                        title="Project Completed",
+                        message=f"{employee_name} is done this project",
+                        entity_type="project",
+                        entity_id=project.id,
+                    )
+                    await hr_notif.insert()
+                    
+            # Notify Admins
+            admin_users = await User.find(
+                User.org_id == org_id,
+                User.role.in_(["admin", "super_admin"]),
+                User.is_active == True
+            ).to_list()
+            for u in admin_users:
+                if u.id != current_user.id:
+                    admin_notif = Notification(
+                        org_id=org_id,
+                        user_id=u.id,
+                        created_by=current_user.id,
+                        type="task_assigned",
+                        title="Project Completed",
+                        message=f"{employee_name} is completed their project so please check the invoices section for generate invoices",
+                        entity_type="project",
+                        entity_id=project.id,
+                    )
+                    await admin_notif.insert()
+        except Exception:
+            pass
+
     # if project.status == "completed" and old_status != "completed":
     #     try:
     #         from models.invoice import Invoice, LineItem

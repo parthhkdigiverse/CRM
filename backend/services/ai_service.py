@@ -5,36 +5,56 @@ AI service — Claude API integration for CRM intelligence features.
 import json
 import logging
 from typing import Tuple, Optional
+import httpx
 
 from config import settings
 
 logger = logging.getLogger(__name__)
 
 
-async def call_claude(prompt: str, system_prompt: str = "", max_tokens: int = 1024) -> Tuple[str, int]:
+async def call_groq(prompt: str, system_prompt: str = "", max_tokens: int = 1024) -> Tuple[str, int]:
     """
-    Call Claude API with a prompt.
+    Call Groq API with a prompt.
     Returns (response_text, tokens_used).
     Gracefully handles missing API key.
     """
-    if not settings.ANTHROPIC_API_KEY:
-        return "AI service not configured. Please set ANTHROPIC_API_KEY in your .env file.", 0
+    if not settings.GROQ_API_KEY:
+        return "AI service not configured. Please set GROQ_API_KEY in your .env file.", 0
 
     try:
-        import anthropic
-        client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
-        message = client.messages.create(
-            model=settings.CLAUDE_MODEL,
-            max_tokens=max_tokens,
-            system=system_prompt or "You are an AI assistant for AI-Setu CRM. Be concise and professional.",
-            messages=[{"role": "user", "content": prompt}],
-        )
-        text = message.content[0].text
-        tokens = message.usage.input_tokens + message.usage.output_tokens
-        return text, tokens
+        url = "https://api.groq.com/openai/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {settings.GROQ_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        else:
+            messages.append({"role": "system", "content": "You are an AI assistant for AI-Setu CRM. Be concise and professional."})
+        messages.append({"role": "user", "content": prompt})
+
+        payload = {
+            "model": settings.GROQ_MODEL or "llama-3.3-70b-versatile",
+            "messages": messages,
+            "max_tokens": max_tokens,
+            "temperature": 0.2
+        }
+
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(url, headers=headers, json=payload)
+            if response.status_code != 200:
+                logger.error(f"Groq API error (status {response.status_code}): {response.text}")
+                return f"Groq API error: {response.text}", 0
+            
+            result = response.json()
+            text = result["choices"][0]["message"]["content"]
+            usage = result.get("usage", {})
+            tokens = usage.get("total_tokens", 0)
+            return text, tokens
     except Exception as e:
-        logger.error(f"Claude API error: {e}")
-        return f"AI service error: {str(e)}", 0
+        logger.error(f"Groq API exception: {e}")
+        return f"Groq API error: {str(e)}", 0
 
 
 async def summarize_entity(entity_data: dict, entity_type: str) -> Tuple[str, int]:
@@ -43,7 +63,7 @@ async def summarize_entity(entity_data: dict, entity_type: str) -> Tuple[str, in
 covering the most important details and current status:
 
 {json.dumps(entity_data, indent=2, default=str)}"""
-    return await call_claude(prompt)
+    return await call_groq(prompt)
 
 
 async def draft_email(entity_data: dict, entity_type: str, context: Optional[str] = None) -> Tuple[str, int]:
@@ -56,7 +76,7 @@ Be concise, warm, and action-oriented.{ctx}
 {json.dumps(entity_data, indent=2, default=str)}
 
 Return only the email body (no subject line). Use proper greeting and sign-off."""
-    return await call_claude(prompt)
+    return await call_groq(prompt)
 
 
 async def analyze_deal(deal_data: dict, activities: list) -> Tuple[str, int]:
@@ -72,7 +92,7 @@ Deal:
 
 Recent activities:
 {json.dumps(activities[:10], indent=2, default=str)}"""
-    return await call_claude(prompt)
+    return await call_groq(prompt)
 
 
 async def explain_lead_score(lead_data: dict, score: int) -> Tuple[str, int]:
@@ -89,7 +109,7 @@ Scoring rules:
 
 Lead data:
 {json.dumps(lead_data, indent=2, default=str)}"""
-    return await call_claude(prompt)
+    return await call_groq(prompt)
 
 
 async def generate_invoice_items(description: str) -> Tuple[str, int]:
@@ -99,7 +119,7 @@ Return a JSON array of objects with keys: description, quantity, unit_price, tax
 Only return the JSON array, no other text.
 
 Description: {description}"""
-    return await call_claude(
+    return await call_groq(
         prompt,
         system_prompt="You are an invoice processing assistant. Return only valid JSON arrays."
     )
@@ -114,4 +134,4 @@ User question: {query}
 
 Available CRM data summary:
 {json.dumps(available_data, indent=2, default=str)}"""
-    return await call_claude(prompt)
+    return await call_groq(prompt)

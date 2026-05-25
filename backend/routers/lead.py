@@ -15,6 +15,7 @@ from schemas.lead import LeadCreate, LeadUpdate, LeadResponse, BulkAssignRequest
 from schemas.common import SuccessResponse, PaginatedResponse
 from utils.helpers import paginate_params, build_paginated_response, build_sort_params, utc_now
 from services.audit_service import log_action
+from models.notification import Notification
 
 router = APIRouter(prefix="/api/v1/leads", tags=["Leads"])
 
@@ -134,6 +135,26 @@ async def create_lead(
     await lead.insert()
     await log_action(str(org.id) if org else None, str(current_user.id), "create", "leads", str(lead.id))
     await sync_assigned_lead_project(lead, current_user)
+
+    # Notify assignee if set
+    if lead.assigned_to:
+        try:
+            emp = await Employee.get(lead.assigned_to)
+            if emp and emp.user_id:
+                notif = Notification(
+                    org_id=org.id if org else lead.org_id,
+                    user_id=emp.user_id,
+                    created_by=current_user.id,
+                    type="lead_assigned",
+                    title="New lead from website" if lead.source == "website" else "Lead assigned to you",
+                    message=f"{lead.name} from {lead.company or 'N/A'} has been assigned to you.",
+                    entity_type="lead",
+                    entity_id=lead.id,
+                )
+                await notif.insert()
+        except Exception:
+            pass
+
     
     # Automation based on status
     if lead.status != "new":
@@ -385,10 +406,30 @@ async def update_lead(
     lead.updated_at = utc_now()
     await lead.save()
     await sync_assigned_lead_project(lead, current_user, old_assigned_to)
+
+    # Notify assignee if changed and not None
+    if lead.assigned_to and lead.assigned_to != old_assigned_to:
+        try:
+            emp = await Employee.get(lead.assigned_to)
+            if emp and emp.user_id:
+                notif = Notification(
+                    org_id=org.id if org else lead.org_id,
+                    user_id=emp.user_id,
+                    created_by=current_user.id,
+                    type="lead_assigned",
+                    title="Lead assigned to you",
+                    message=f"{lead.name} from {lead.company or 'N/A'} has been assigned to you.",
+                    entity_type="lead",
+                    entity_id=lead.id,
+                )
+                await notif.insert()
+        except Exception:
+            pass
     
     await log_action(str(org.id) if org else None, str(current_user.id), "update", "leads", str(lead.id), changes=update_data)
     
     return SuccessResponse(message="Lead updated successfully")
+
 @router.delete("/{lead_id}", response_model=SuccessResponse)
 async def delete_lead(
     lead_id: str,
@@ -425,7 +466,27 @@ async def bulk_assign_leads(
     assigned_leads = await Lead.find(org_filter(org, {"_id": {"$in": lead_ids}})).to_list()
     for lead in assigned_leads:
         await sync_assigned_lead_project(lead, current_user)
+
+    # Notify bulk assignee
+    try:
+        emp = await Employee.get(assigned_to)
+        if emp and emp.user_id:
+            for lead in assigned_leads:
+                notif = Notification(
+                    org_id=org.id if org else lead.org_id,
+                    user_id=emp.user_id,
+                    created_by=current_user.id,
+                    type="lead_assigned",
+                    title="Lead assigned to you",
+                    message=f"{lead.name} from {lead.company or 'N/A'} has been assigned to you.",
+                    entity_type="lead",
+                    entity_id=lead.id,
+                )
+                await notif.insert()
+    except Exception:
+        pass
     
     await log_action(str(org.id) if org else None, str(current_user.id), "bulk_update", "leads", changes={"action": "bulk_assign", "count": len(lead_ids)})
     
     return SuccessResponse(message=f"Successfully assigned {len(lead_ids)} leads")
+

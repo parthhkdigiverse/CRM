@@ -11,6 +11,7 @@ from middleware.rbac import require_module_read, require_module_write, require_m
 from models.user import User
 from models.organization import Organization
 from models.invoice import Invoice, LineItem
+from models.notification import Notification
 from schemas.invoice import InvoiceCreate, InvoiceUpdate, InvoiceResponse, MarkPaidRequest
 from schemas.common import SuccessResponse, PaginatedResponse
 from utils.helpers import paginate_params, build_paginated_response, build_sort_params, generate_invoice_number, utc_now
@@ -162,7 +163,31 @@ async def mark_invoice_paid(
     
     await log_action(str(org.id) if org else "super_admin", str(current_user.id), "update", "invoices", str(invoice.id), changes={"status": "paid"})
     
+    # Notify creator and admins
+    if org:
+        try:
+            notify_user_ids = {invoice.created_by} if invoice.created_by else set()
+            admins = await User.find(User.org_id == org.id, User.role.in_(["admin", "super_admin"])).to_list()
+            for admin in admins:
+                notify_user_ids.add(admin.id)
+                
+            for uid in notify_user_ids:
+                notif = Notification(
+                    org_id=org.id,
+                    user_id=uid,
+                    created_by=current_user.id,
+                    type="payment_received",
+                    title=f"Payment received • ₹{invoice.total:,.2f}",
+                    message=f"Invoice #{invoice.invoice_number} paid by client via {invoice.payment_method or 'Razorpay'}.",
+                    entity_type="invoice",
+                    entity_id=invoice.id,
+                )
+                await notif.insert()
+        except Exception:
+            pass
+
     return SuccessResponse(message="Invoice marked as paid")
+
 
 
 @router.delete("/{invoice_id}", response_model=SuccessResponse)

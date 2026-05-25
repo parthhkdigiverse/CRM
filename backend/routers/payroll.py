@@ -9,6 +9,7 @@ from models.user import User
 from models.organization import Organization
 from models.payroll import Payroll
 from models.employee import Employee
+from models.notification import Notification
 from schemas.common import SuccessResponse
 from utils.security import decrypt_field
 from utils.helpers import parse_object_id, paginate_params, build_paginated_response
@@ -137,7 +138,26 @@ async def generate_payroll(
         )
         await p.insert()
         await log_action(str(org.id) if org else None, str(current_user.id), "create", "payroll", str(p.id))
+        
+        # Notify the employee
+        if emp.user_id:
+            try:
+                notif = Notification(
+                    org_id=org.id if org else parse_object_id(p.org_id, "org_id"),
+                    user_id=emp.user_id,
+                    created_by=current_user.id,
+                    type="payment_received",
+                    title="Payroll generated",
+                    message=f"Your payroll for {month} has been generated. Net Payable: ₹{net_pay:,.2f}.",
+                    entity_type="payroll",
+                    entity_id=p.id,
+                )
+                await notif.insert()
+            except Exception:
+                pass
+                
         generated += 1
+
         
     return SuccessResponse(message=f"Successfully generated payroll for {generated} employees.")
 
@@ -163,6 +183,25 @@ async def update_payroll(
         setattr(payroll, k, v)
         
     await payroll.save()
+
+    # Notify employee when marked Paid
+    if "status" in update_data and update_data["status"] == "Paid":
+        try:
+            emp = await Employee.get(PydanticObjectId(payroll.employee_id))
+            if emp and emp.user_id:
+                notif = Notification(
+                    org_id=parse_object_id(payroll.org_id, "org_id"),
+                    user_id=emp.user_id,
+                    created_by=current_user.id,
+                    type="payment_received",
+                    title="Salary processed",
+                    message=f"Your salary for {payroll.month} has been paid! Net Amount: ₹{payroll.net_pay:,.2f}.",
+                    entity_type="payroll",
+                    entity_id=payroll.id,
+                )
+                await notif.insert()
+        except Exception:
+            pass
     
     # Sync status and net_pay to Expenses collection
     if payroll.status == "Paid":

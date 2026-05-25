@@ -14,6 +14,7 @@ from pydantic import BaseModel
 from models.user import User
 from models.employee import Employee
 from models.chat import ChatRoom, ChatMessage
+from models.notification import Notification
 from middleware.auth_middleware import get_current_user
 from services.token_service import decode_access_token, is_token_blacklisted
 
@@ -385,6 +386,24 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(...)):
                 if reply_to:
                     new_msg.reply_to_id = PydanticObjectId(reply_to)
                 await new_msg.insert()
+
+                # Notify other participants in the room
+                try:
+                    for pid in room.participants:
+                        if pid != user.id:
+                            notif = Notification(
+                                org_id=user.org_id,
+                                user_id=pid,
+                                created_by=user.id,
+                                type="new_message",
+                                title=f"New message in {room.name}" if room.room_type == "group" else f"New message from {user.full_name or user.email}",
+                                message=content[:100],
+                                entity_type="chat",
+                                entity_id=room.id,
+                            )
+                            await notif.insert()
+                except Exception:
+                    pass
 
                 room.last_message_at = datetime.now(timezone.utc)
                 await room.save()

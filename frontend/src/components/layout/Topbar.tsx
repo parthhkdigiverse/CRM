@@ -1,4 +1,6 @@
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
+import { apiClient } from '@/lib/axios';
 import { 
   Bell, 
   Search, 
@@ -34,6 +36,28 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
   const { user, organization, logout } = useAuthStore();
   const { isDark, toggleTheme } = useThemeStore();
   const navigate = useNavigate();
+
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    const fetchUnreadCount = async () => {
+      try {
+        const res = await apiClient.get('/notifications');
+        if (res.data?.success) {
+          const list = res.data.data || [];
+          const count = list.filter((n: any) => !n.is_read).length;
+          setUnreadCount(count);
+        }
+      } catch (err) {
+        // ignore
+      }
+    };
+    
+    fetchUnreadCount();
+    const interval = setInterval(fetchUnreadCount, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
   
   const initials = user?.full_name
     ? user.full_name
@@ -93,10 +117,17 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
         </Button>
         
         <div className="relative">
-          <Button variant="ghost" size="icon" className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 rounded-full h-9 w-9">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 rounded-full h-9 w-9"
+            onClick={() => navigate('/notifications')}
+          >
             <Bell className="h-4 w-4" />
           </Button>
-          <span className="absolute top-2 right-2 h-1.5 w-1.5 rounded-full bg-red-500"></span>
+          {unreadCount > 0 && (
+            <span className="absolute top-2.5 right-2.5 h-1.5 w-1.5 rounded-full bg-red-500"></span>
+          )}
         </div>
 
         {/* Dark Mode Toggle */}

@@ -13,6 +13,7 @@ from models.overtime import Overtime
 from models.payroll import Payroll
 from models.expense import Expense
 from schemas.overtime import OvertimeCreate, OvertimeResponse
+from models.notification import Notification
 from schemas.common import SuccessResponse, PaginatedResponse
 from utils.helpers import paginate_params, build_paginated_response, parse_object_id
 from services.audit_service import log_action
@@ -98,6 +99,30 @@ async def log_overtime(
 
     # 4. Trigger payroll recalculation
     await recalculate_payroll_for_month(str(employee.id), month_name, org_id_str, str(current_user.id))
+
+    # 5. Notify HR and Admins
+    if org:
+        try:
+            notify_users = await User.find(
+                User.org_id == org.id,
+                User.role.in_(["admin", "super_admin", "hr"])
+            ).to_list()
+            for u in notify_users:
+                if u.id != current_user.id:
+                    notif = Notification(
+                        org_id=org.id,
+                        user_id=u.id,
+                        created_by=current_user.id,
+                        type="task_overtime",
+                        title="Overtime logged",
+                        message=f"{employee.name} logged {data.hours} hours of overtime for {month_name}.",
+                        entity_type="task",
+                        entity_id=overtime.id,
+                    )
+                    await notif.insert()
+        except Exception:
+            pass
+
 
     return SuccessResponse(
         data={"id": str(overtime.id), "amount": amount},

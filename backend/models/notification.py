@@ -18,6 +18,7 @@ class Notification(Document):
     title: str
     message: str
     is_read: bool = False
+    is_starred: bool = False
     entity_type: Optional[str] = None
     entity_id: Optional[PydanticObjectId] = None
 

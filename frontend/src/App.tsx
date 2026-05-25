@@ -41,6 +41,7 @@ import Expenses from './pages/Expenses';
 import AccessDenied from './pages/AccessDenied';
 import AdminPanel from './pages/AdminPanel';
 import Chat from './pages/Chat';
+import Notifications from './pages/Notifications';
 
 const ProtectedRoute = ({ children, requireOrg = false }: { children: React.ReactNode, requireOrg?: boolean }) => {
   const { isAuthenticated, user, organization, isLoading } = useAuthStore();
@@ -271,6 +272,7 @@ function App() {
             <Route path="leaves" element={<Leaves />} />
             <Route path="targets" element={<Targets />} />
             <Route path="ai" element={<AIAssistant />} />
+            <Route path="notifications" element={<Notifications />} />
           </Route>
         </Routes>
       </Router>

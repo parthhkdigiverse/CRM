@@ -12,6 +12,8 @@ from middleware.rbac import require_module_read, require_module_write, require_m
 from models.user import User
 from models.organization import Organization
 from models.meeting import Meeting
+from models.notification import Notification
+from models.employee import Employee
 from schemas.meeting import MeetingCreate, MeetingUpdate
 from schemas.common import SuccessResponse
 from utils.helpers import utc_now
@@ -41,6 +43,26 @@ async def create_meeting(
     )
     await meeting.insert()
     await log_action(str(org.id) if org else None, str(current_user.id), "create", "meetings", str(meeting.id), changes={"title": data.title})
+    
+    # Notify attendees
+    try:
+        for aid in attendees:
+            emp = await Employee.get(aid)
+            if emp and emp.user_id:
+                notif = Notification(
+                    org_id=org.id if org else meeting.org_id,
+                    user_id=emp.user_id,
+                    created_by=current_user.id,
+                    type="meeting_scheduled",
+                    title="New meeting scheduled",
+                    message=f"{current_user.full_name or current_user.email} invited you to '{data.title}'. Location: {data.location or 'N/A'}",
+                    entity_type="meeting",
+                    entity_id=meeting.id,
+                )
+                await notif.insert()
+    except Exception:
+        pass
+
 
     return SuccessResponse(
         data={"id": str(meeting.id)},

@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/axios';
+import { useAuthStore } from '@/store/authStore';
 
 // Custom inline switch component to match shadcn styling
 const Switch = ({ checked, onChange, id }: { checked: boolean; onChange: (val: boolean) => void; id?: string }) => (
@@ -44,6 +45,9 @@ const Switch = ({ checked, onChange, id }: { checked: boolean; onChange: (val: b
 );
 
 export default function Notifications() {
+  const { user } = useAuthStore();
+  const isExcludedRole = user?.role === 'employee' || user?.role === 'hr';
+  
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState<any[]>([]);
   const [settings, setSettings] = useState<any>({
@@ -242,16 +246,20 @@ export default function Notifications() {
   };
 
   // Derived counts for filters and categories
-  const unreadTotal = notifications.filter(n => !n.is_read).length;
-  const starredTotal = notifications.filter(n => n.is_starred).length;
+  const activeNotifications = isExcludedRole
+    ? notifications.filter(n => !['Payments', 'System', 'Inventory', 'Reports'].includes(n.category))
+    : notifications;
+
+  const unreadTotal = activeNotifications.filter(n => !n.is_read).length;
+  const starredTotal = activeNotifications.filter(n => n.is_starred).length;
 
   const getCategoryCount = (catName: string) => {
-    if (catName === 'all') return notifications.length;
-    return notifications.filter(n => n.category === catName).length;
+    if (catName === 'all') return activeNotifications.length;
+    return activeNotifications.filter(n => n.category === catName).length;
   };
 
   // Filtered notifications logic
-  const filteredNotifications = notifications.filter(n => {
+  const filteredNotifications = activeNotifications.filter(n => {
     // 1. Active Filter (All, Unread, Starred)
     if (activeFilter === 'unread' && n.is_read) return false;
     if (activeFilter === 'starred' && !n.is_starred) return false;
@@ -268,7 +276,9 @@ export default function Notifications() {
     return true;
   });
 
-  const categoriesList = ['Leads', 'Payments', 'Messages', 'Tasks', 'System', 'Meetings', 'Inventory', 'Reports'];
+  const categoriesList = isExcludedRole
+    ? ['Leads', 'Messages', 'Tasks', 'Meetings']
+    : ['Leads', 'Payments', 'Messages', 'Tasks', 'System', 'Meetings', 'Inventory', 'Reports'];
 
   return (
     <div className="flex-1 flex flex-col h-full bg-gray-50/50 dark:bg-gray-950 overflow-hidden">
@@ -562,16 +572,18 @@ export default function Notifications() {
                 />
               </div>
 
-              <div className="flex items-center justify-between">
-                <div className="flex flex-col">
-                  <span className="text-xs font-semibold text-gray-900 dark:text-white">Payments & invoices</span>
-                  <span className="text-[11px] text-gray-400">When payment clears or invoice overdue</span>
+              {!isExcludedRole && (
+                <div className="flex items-center justify-between">
+                  <div className="flex flex-col">
+                    <span className="text-xs font-semibold text-gray-900 dark:text-white">Payments & invoices</span>
+                    <span className="text-[11px] text-gray-400">When payment clears or invoice overdue</span>
+                  </div>
+                  <Switch 
+                    checked={settings.notify_types?.payments ?? true} 
+                    onChange={(val) => handleUpdateSettings('notify_types', 'payments', val)} 
+                  />
                 </div>
-                <Switch 
-                  checked={settings.notify_types?.payments ?? true} 
-                  onChange={(val) => handleUpdateSettings('notify_types', 'payments', val)} 
-                />
-              </div>
+              )}
 
               <div className="flex items-center justify-between">
                 <div className="flex flex-col">
@@ -584,16 +596,18 @@ export default function Notifications() {
                 />
               </div>
 
-              <div className="flex items-center justify-between">
-                <div className="flex flex-col">
-                  <span className="text-xs font-semibold text-gray-900 dark:text-white">System & security alerts</span>
-                  <span className="text-[11px] text-gray-400">Critical server or auth logs</span>
+              {!isExcludedRole && (
+                <div className="flex items-center justify-between">
+                  <div className="flex flex-col">
+                    <span className="text-xs font-semibold text-gray-900 dark:text-white">System & security alerts</span>
+                    <span className="text-[11px] text-gray-400">Critical server or auth logs</span>
+                  </div>
+                  <Switch 
+                    checked={settings.notify_types?.system ?? true} 
+                    onChange={(val) => handleUpdateSettings('notify_types', 'system', val)} 
+                  />
                 </div>
-                <Switch 
-                  checked={settings.notify_types?.system ?? true} 
-                  onChange={(val) => handleUpdateSettings('notify_types', 'system', val)} 
-                />
-              </div>
+              )}
             </CardContent>
           </Card>
 

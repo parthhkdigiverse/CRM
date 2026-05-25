@@ -71,6 +71,10 @@ async def list_notifications(
         if category and category.lower() != "all" and notif_cat.lower() != category.lower():
             continue
             
+        # Exclude restricted categories for employee and hr roles
+        if current_user.role in ["employee", "hr"] and notif_cat in ["Inventory", "Reports", "System", "Payments"]:
+            continue
+            
         d = notif.model_dump()
         d["id"] = str(notif.id)
         d["user_id"] = str(notif.user_id)

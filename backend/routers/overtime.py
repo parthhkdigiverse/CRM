@@ -104,8 +104,7 @@ async def log_overtime(
     if org:
         try:
             notify_users = await User.find(
-                User.org_id == org.id,
-                User.role.in_(["admin", "super_admin", "hr"])
+                {"org_id": org.id, "role": {"$in": ["admin", "super_admin", "hr"]}}
             ).to_list()
             for u in notify_users:
                 if u.id != current_user.id:

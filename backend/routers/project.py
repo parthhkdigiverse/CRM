@@ -187,9 +187,7 @@ async def update_project(
                     
             # Notify Admins
             admin_users = await User.find(
-                User.org_id == org_id,
-                User.role.in_(["admin", "super_admin"]),
-                User.is_active == True
+                {"org_id": org_id, "role": {"$in": ["admin", "super_admin"]}, "is_active": True}
             ).to_list()
             for u in admin_users:
                 if u.id != current_user.id:

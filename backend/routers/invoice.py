@@ -167,7 +167,9 @@ async def mark_invoice_paid(
     if org:
         try:
             notify_user_ids = {invoice.created_by} if invoice.created_by else set()
-            admins = await User.find(User.org_id == org.id, User.role.in_(["admin", "super_admin"])).to_list()
+            admins = await User.find(
+                {"org_id": org.id, "role": {"$in": ["admin", "super_admin"]}}
+            ).to_list()
             for admin in admins:
                 notify_user_ids.add(admin.id)
                 

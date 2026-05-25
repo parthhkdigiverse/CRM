@@ -190,6 +190,13 @@ export default function Notifications() {
       case 'inventory':
         navigate('/inventory');
         break;
+      case 'project':
+        if (n.message && n.message.toLowerCase().includes('invoice')) {
+          navigate('/invoices');
+        } else {
+          navigate('/projects');
+        }
+        break;
       default:
         break;
     }

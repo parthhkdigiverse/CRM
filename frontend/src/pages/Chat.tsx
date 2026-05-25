@@ -29,6 +29,10 @@ type ChatMessageItem = {
 };
 
 const INDIAN_TIME_ZONE = 'Asia/Kolkata';
+const parseUtcDate = (iso: string) => {
+  const hasTimeZone = /(?:Z|[+-]\d{2}:?\d{2})$/.test(iso);
+  return new Date(hasTimeZone ? iso : `${iso}Z`);
+};
 const indianDateKey = (date: Date) =>
   new Intl.DateTimeFormat('en-CA', {
     timeZone: INDIAN_TIME_ZONE,
@@ -64,14 +68,14 @@ const isYesterdayInIndia = (date: Date, now = new Date()) => {
 };
 
 const fmtTime = (iso: string) => {
-  const d = new Date(iso);
+  const d = parseUtcDate(iso);
   if (isTodayInIndia(d)) return indianTime(d);
   if (isYesterdayInIndia(d)) return 'Yesterday';
   return indianDate(d);
 };
-const fmtMsg = (iso: string) => indianTime(new Date(iso));
+const fmtMsg = (iso: string) => indianTime(parseUtcDate(iso));
 const canEditMessage = (msg: ChatMessageItem, userId?: string) =>
-  msg.sender_id === userId && Date.now() - new Date(msg.created_at).getTime() <= 5 * 60 * 1000;
+  msg.sender_id === userId && Date.now() - parseUtcDate(msg.created_at).getTime() <= 5 * 60 * 1000;
 const apiErrorMessage = (error: unknown, fallback: string) => {
   const maybeError = error as { response?: { data?: { detail?: string } } };
   return maybeError.response?.data?.detail || fallback;
@@ -94,7 +98,7 @@ function TypingDots() {
 
 /* Date separator */
 function DateBadge({ date }: { date: string }) {
-  const d = new Date(date);
+  const d = parseUtcDate(date);
   let label = indianLongDate(d);
   if (isTodayInIndia(d)) label = 'Today';
   else if (isYesterdayInIndia(d)) label = 'Yesterday';
@@ -614,7 +618,7 @@ export default function Chat() {
                     {messages.map((msg, idx) => {
                       const isMe = msg.sender_id === user?.id;
                       const prev = messages[idx - 1];
-                      const showDate = !prev || indianDateKey(new Date(msg.created_at)) !== indianDateKey(new Date(prev.created_at));
+                      const showDate = !prev || indianDateKey(parseUtcDate(msg.created_at)) !== indianDateKey(parseUtcDate(prev.created_at));
                       
                       const stripped = msg.content.replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}\u200d\uFE0F\u20E3\s]/gu, '');
                       const isEmojiOnly = stripped.length === 0 && msg.content.trim().length > 0 && msg.content.trim().length <= 30;

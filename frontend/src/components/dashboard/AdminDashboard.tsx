@@ -29,6 +29,18 @@ import { apiClient } from '@/lib/axios';
 import { formatINRCompact, formatINR } from '@/lib/currency';
 
 // Dynamic Lead status counts for pie chart
+const parseUtcDate = (iso?: string) => {
+  if (!iso) return null;
+  const hasTimeZone = /(?:Z|[+-]\d{2}:?\d{2})$/.test(iso);
+  const date = new Date(hasTimeZone ? iso : `${iso}Z`);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const isWithinLastDays = (iso: string | undefined, days: number) => {
+  const date = parseUtcDate(iso);
+  if (!date) return false;
+  return Date.now() - date.getTime() <= days * 24 * 60 * 60 * 1000;
+};
 
 const FinancialTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
@@ -54,7 +66,7 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState({
     totalRevenue: 0,
     newLeadsCount: 0,
-    salesToday: 0,
+    recentWinsCount: 0,
     pendingDues: 0,
   });
 
@@ -64,15 +76,13 @@ export default function AdminDashboard() {
   const fetchDashboardData = useCallback(async () => {
     try {
       setLoading(true);
-      const [leadsRes, dealsRes, invoicesRes, reportsRes] = await Promise.all([
+      const [leadsRes, invoicesRes, reportsRes] = await Promise.all([
         apiClient.get('/leads?per_page=100'),
-        apiClient.get('/deals?per_page=100'),
         apiClient.get('/invoices?per_page=100'),
         apiClient.get('/reports/summary'),
       ]);
 
       const leadsList = leadsRes.data.data || [];
-      const dealsList = dealsRes.data.data || [];
       const invoicesList = invoicesRes.data.data || [];
       const reportsData = reportsRes.data.data || {};
 
@@ -83,21 +93,10 @@ export default function AdminDashboard() {
       // Calculate New Leads Count (status = 'new')
       const newLeadsCount = leadsList.filter((l: any) => l.status === 'new').length;
 
-      // Calculate Sales Today (deals won or paid invoices created/payment today)
-      const todayStr = new Date().toDateString();
-      
-      // Look at deals won today, or fallback to won deals in general if none today
-      let salesToday = dealsList
-        .filter((d: any) => d.stage === 'won' && new Date(d.created_at || d.updated_at).toDateString() === todayStr)
-        .reduce((sum: number, d: any) => sum + (d.value || 0), 0);
-
-      if (salesToday === 0) {
-        // Fallback to latest won deal amount to look active
-        const wonDeals = dealsList.filter((d: any) => d.stage === 'won');
-        if (wonDeals.length > 0) {
-          salesToday = wonDeals[0].value || 0;
-        }
-      }
+      // Recent Wins: leads converted in the last 30 days.
+      const recentWinsCount = leadsList
+        .filter((l: any) => l.status === 'converted' && isWithinLastDays(l.updated_at || l.created_at, 30))
+        .length;
 
       // Calculate Pending Dues (sent or overdue invoices total)
       const pendingDues = invoicesList
@@ -107,7 +106,7 @@ export default function AdminDashboard() {
       setStats({
         totalRevenue,
         newLeadsCount,
-        salesToday,
+        recentWinsCount,
         pendingDues,
       });
 
@@ -207,9 +206,9 @@ export default function AdminDashboard() {
           <CardContent className="p-5 flex justify-between items-start">
             <div className="space-y-2">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Recent Wins</p>
-              <div className="text-3xl font-bold">{formatINRCompact(stats.salesToday)}</div>
+              <div className="text-3xl font-bold">{stats.recentWinsCount}</div>
               <p className="text-xs font-medium text-emerald-500 flex items-center">
-                <TrendingUp className="h-3 w-3 mr-1" /> Total won deals value
+                <TrendingUp className="h-3 w-3 mr-1" /> Converted leads in last 30 days
               </p>
             </div>
             <div className="h-10 w-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">

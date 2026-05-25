@@ -60,6 +60,7 @@ export default function Notifications() {
   const [activeFilter, setActiveFilter] = useState<'all' | 'unread' | 'starred'>('all');
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [quietHoursEdit, setQuietHoursEdit] = useState(false);
+  const [nowMs, setNowMs] = useState(Date.now());
 
   // Fetch notifications and settings
   const fetchData = async () => {
@@ -86,11 +87,18 @@ export default function Notifications() {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    const timer = window.setInterval(() => setNowMs(Date.now()), 30000);
+    return () => window.clearInterval(timer);
+  }, []);
+
   // Update a single notification read status
   const handleToggleRead = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    const current = notifications.find(n => n.id === id);
+    const nextRead = !(current?.is_read ?? false);
     try {
-      const res = await apiClient.put(`/notifications/${id}/read`);
+      const res = await apiClient.put(`/notifications/${id}/read`, { is_read: nextRead });
       if (res.data?.success) {
         setNotifications(prev =>
           prev.map(n => (n.id === id ? { ...n, is_read: res.data.data.is_read } : n))
@@ -166,7 +174,7 @@ export default function Notifications() {
   const handleNavigateEntity = (n: any) => {
     // Mark as read if not already
     if (!n.is_read) {
-      apiClient.put(`/notifications/${n.id}/read`).then(() => {
+      apiClient.put(`/notifications/${n.id}/read`, { is_read: true }).then(() => {
         setNotifications(prev => prev.map(item => item.id === n.id ? { ...item, is_read: true } : item));
       });
     }
@@ -208,9 +216,11 @@ export default function Notifications() {
 
   // Format creation datetime to relative string (e.g. 5m ago)
   const formatRelativeTime = (dateStr: string) => {
-    const d = new Date(dateStr);
-    const now = new Date();
-    const diffMs = now.getTime() - d.getTime();
+    const hasTimeZone = /(?:Z|[+-]\d{2}:?\d{2})$/.test(dateStr);
+    const d = new Date(hasTimeZone ? dateStr : `${dateStr}Z`);
+    if (Number.isNaN(d.getTime())) return 'Just now';
+
+    const diffMs = Math.max(0, nowMs - d.getTime());
     
     const diffSecs = Math.floor(diffMs / 1000);
     const diffMins = Math.floor(diffSecs / 60);
@@ -220,7 +230,11 @@ export default function Notifications() {
     if (diffSecs < 60) return 'Just now';
     if (diffMins < 60) return `${diffMins}m ago`;
     if (diffHours < 24) return `${diffHours}h ago`;
-    return `${diffDays}d ago`;
+    if (diffDays < 30) return `${diffDays}d ago`;
+    const diffMonths = Math.floor(diffDays / 30);
+    if (diffMonths < 12) return `${diffMonths}mo ago`;
+    const diffYears = Math.floor(diffDays / 365);
+    return `${diffYears}y ago`;
   };
 
   // Map category details

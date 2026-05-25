@@ -37,6 +37,7 @@ interface Deal {
   contact_email?: string;
   contact_phone?: string;
   created_at: string;
+  updated_at?: string;
   isLead?: boolean;
 }
 
@@ -60,7 +61,22 @@ interface Lead {
   value: number;
   job_title?: string;
   created_at: string;
+  updated_at?: string;
 }
+
+const parseUtcDate = (iso?: string) => {
+  if (!iso) return null;
+  const hasTimeZone = /(?:Z|[+-]\d{2}:?\d{2})$/.test(iso);
+  const date = new Date(hasTimeZone ? iso : `${iso}Z`);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const isThisMonth = (iso?: string) => {
+  const date = parseUtcDate(iso);
+  if (!date) return false;
+  const now = new Date();
+  return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth();
+};
 
 const stageConfig = [
   { id: 'prospecting', name: 'New Lead', color: 'bg-blue-500 border-blue-500' },
@@ -91,6 +107,7 @@ const getAvatarColor = (name: string) => {
 export default function Deals() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deals, setDeals] = useState<Deal[]>([]);
+  const [leads, setLeads] = useState<Lead[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [clientSearch, setClientSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -113,6 +130,7 @@ export default function Deals() {
 
       const fetchedDeals: Deal[] = dealsRes.data.data || [];
       const fetchedLeads: Lead[] = leadsRes.data.data || [];
+      setLeads(fetchedLeads);
 
       // Map unconverted Leads to Deal format to display in the CRM pipeline columns
       const mappedLeads: Deal[] = fetchedLeads
@@ -136,6 +154,7 @@ export default function Deals() {
             contact_email: l.email,
             contact_phone: l.phone,
             created_at: l.created_at,
+            updated_at: l.updated_at,
             isLead: true,
           };
         });
@@ -234,7 +253,9 @@ export default function Deals() {
   const activePipelineValue = deals
     .filter(d => !['closed_won', 'closed_lost'].includes(d.stage))
     .reduce((sum, d) => sum + (d.value || 0), 0);
-  const wonThisMonthCount = deals.filter(d => d.stage === 'closed_won').length;
+  const wonThisMonthCount =
+    deals.filter(d => d.stage === 'closed_won' && isThisMonth(d.updated_at || d.created_at)).length +
+    leads.filter(l => l.status === 'converted' && isThisMonth(l.updated_at || l.created_at)).length;
   
   // Calculate average deal size excluding leads/deals with 0 value
   const dealsWithValue = deals.filter(d => d.value > 0);

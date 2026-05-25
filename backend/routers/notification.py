@@ -7,6 +7,7 @@ from typing import Optional, List, Dict
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from beanie import PydanticObjectId
+from pydantic import BaseModel
 
 from middleware.auth_middleware import get_current_user
 from models.user import User
@@ -16,6 +17,29 @@ from schemas.common import SuccessResponse
 from utils.helpers import parse_object_id, utc_now
 
 router = APIRouter(prefix="/api/v1/notifications", tags=["Notifications"])
+
+
+class NotificationReadUpdate(BaseModel):
+    is_read: Optional[bool] = None
+
+
+def _aware_utc(dt: Optional[datetime]) -> Optional[datetime]:
+    if dt is None:
+        return None
+    return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt.astimezone(timezone.utc)
+
+
+def _notification_payload(notif: Notification, category: str) -> dict:
+    d = notif.model_dump()
+    d["id"] = str(notif.id)
+    d["user_id"] = str(notif.user_id)
+    d["created_by"] = str(notif.created_by)
+    if d.get("entity_id"):
+        d["entity_id"] = str(d["entity_id"])
+    d["created_at"] = _aware_utc(notif.created_at).isoformat() if notif.created_at else None
+    d["updated_at"] = _aware_utc(notif.updated_at).isoformat() if notif.updated_at else None
+    d["category"] = category
+    return d
 
 
 def map_notification_to_category(notif: Notification) -> str:
@@ -75,16 +99,7 @@ async def list_notifications(
         if current_user.role in ["employee", "hr"] and notif_cat in ["Inventory", "Reports", "System", "Payments"]:
             continue
             
-        d = notif.model_dump()
-        d["id"] = str(notif.id)
-        d["user_id"] = str(notif.user_id)
-        d["created_by"] = str(notif.created_by)
-        if d.get("entity_id"):
-            d["entity_id"] = str(d["entity_id"])
-        
-        # Inject category
-        d["category"] = notif_cat
-        data.append(d)
+        data.append(_notification_payload(notif, notif_cat))
 
     return SuccessResponse(data=data)
 
@@ -113,17 +128,22 @@ async def clear_all(current_user: User = Depends(get_current_user)):
 
 
 @router.put("/{notification_id}/read", response_model=SuccessResponse)
-async def mark_read(notification_id: str, current_user: User = Depends(get_current_user)):
-    """Toggle a notification as read."""
+async def mark_read(
+    notification_id: str,
+    data: Optional[NotificationReadUpdate] = None,
+    current_user: User = Depends(get_current_user)
+):
+    """Mark or toggle a notification read status."""
+    notification_oid = parse_object_id(notification_id, "notification_id")
     notif = await Notification.find_one(
         Notification.user_id == current_user.id,
         Notification.is_deleted == False,
-        {"_id": parse_object_id(notification_id, "notification_id")}
+        Notification.id == notification_oid
     )
     if not notif:
         raise HTTPException(status_code=404, detail="Notification not found")
         
-    notif.is_read = not notif.is_read
+    notif.is_read = data.is_read if data and data.is_read is not None else not notif.is_read
     notif.updated_at = utc_now()
     await notif.save()
     
@@ -136,10 +156,11 @@ async def mark_read(notification_id: str, current_user: User = Depends(get_curre
 @router.put("/{notification_id}/star", response_model=SuccessResponse)
 async def toggle_star(notification_id: str, current_user: User = Depends(get_current_user)):
     """Toggle a notification's starred status."""
+    notification_oid = parse_object_id(notification_id, "notification_id")
     notif = await Notification.find_one(
         Notification.user_id == current_user.id,
         Notification.is_deleted == False,
-        {"_id": parse_object_id(notification_id, "notification_id")}
+        Notification.id == notification_oid
     )
     if not notif:
         raise HTTPException(status_code=404, detail="Notification not found")

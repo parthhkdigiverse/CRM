@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Any, Optional
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, Query, HTTPException
 from beanie import PydanticObjectId
@@ -17,6 +17,13 @@ from services.audit_service import log_action
 
 router = APIRouter(prefix="/api/v1/payroll", tags=["Payroll"])
 
+
+def require_object_id(value: Optional[PydanticObjectId], field_name: str) -> PydanticObjectId:
+    if value is None:
+        raise HTTPException(status_code=500, detail=f"Missing {field_name}")
+    return value
+
+
 @router.get("")
 async def get_payrolls(
     month: Optional[str] = None,
@@ -25,7 +32,7 @@ async def get_payrolls(
     current_user: User = Depends(get_current_user),
     org: Optional[Organization] = Depends(get_current_org)
 ):
-    query = {}
+    query: dict[str, Any] = {}
     if org:
         query["org_id"] = str(org.id)
     if month:
@@ -81,8 +88,10 @@ async def generate_payroll(
     current_user: User = Depends(require_module_full("payroll")),
     org: Optional[Organization] = Depends(get_current_org)
 ):
+    current_user_id = require_object_id(current_user.id, "current_user.id")
+
     # Fetch all active employees
-    query = {"is_deleted": False}
+    query: dict[str, Any] = {"is_deleted": False}
     if org:
         query["org_id"] = org.id
         
@@ -90,11 +99,13 @@ async def generate_payroll(
     
     generated = 0
     for emp in employees:
+        payroll_org_id = str(emp.org_id)
+
         # Check if already exists
         existing = await Payroll.find_one({
             "employee_id": str(emp.id), 
             "month": month,
-            "org_id": str(org.id) if org else ""
+            "org_id": payroll_org_id
         })
         if existing:
             continue
@@ -117,7 +128,7 @@ async def generate_payroll(
         overtimes = await Overtime.find({
             "employee_id": str(emp.id),
             "month": month,
-            "org_id": str(org.id) if org else ""
+            "org_id": payroll_org_id
         }).to_list()
         overtime_pay = sum(o.amount for o in overtimes)
         
@@ -125,7 +136,7 @@ async def generate_payroll(
         
         p = Payroll(
             employee_id=str(emp.id),
-            org_id=str(org.id) if org else "",
+            org_id=payroll_org_id,
             month=month,
             working_days=working_days,
             worked_days=worked_days,
@@ -137,20 +148,22 @@ async def generate_payroll(
             status="Pending"
         )
         await p.insert()
-        await log_action(str(org.id) if org else None, str(current_user.id), "create", "payroll", str(p.id))
+        payroll_id = require_object_id(p.id, "payroll.id")
+        await log_action(payroll_org_id, str(current_user_id), "create", "payroll", str(payroll_id))
         
         # Notify the employee
-        if emp.user_id:
+        emp_user_id = emp.user_id
+        if emp_user_id is not None:
             try:
                 notif = Notification(
-                    org_id=org.id if org else parse_object_id(p.org_id, "org_id"),
-                    user_id=emp.user_id,
-                    created_by=current_user.id,
+                    org_id=emp.org_id,
+                    user_id=emp_user_id,
+                    created_by=current_user_id,
                     type="payment_received",
                     title="Payroll generated",
                     message=f"Your payroll for {month} has been generated. Net Payable: ₹{net_pay:,.2f}.",
                     entity_type="payroll",
-                    entity_id=p.id,
+                    entity_id=payroll_id,
                 )
                 await notif.insert()
             except Exception:
@@ -170,13 +183,16 @@ async def update_payroll(
     current_user: User = Depends(require_module_full("payroll")),
     org: Optional[Organization] = Depends(get_current_org)
 ):
-    query = {"_id": parse_object_id(payroll_id, "payroll_id")}
+    current_user_id = require_object_id(current_user.id, "current_user.id")
+
+    query: dict[str, Any] = {"_id": parse_object_id(payroll_id, "payroll_id")}
     if org:
         query["org_id"] = str(org.id)
         
     payroll = await Payroll.find_one(query)
     if not payroll:
         raise HTTPException(status_code=404, detail="Payroll not found")
+    payroll_object_id = require_object_id(payroll.id, "payroll.id")
         
     update_data = data.model_dump(exclude_unset=True)
     for k, v in update_data.items():
@@ -188,16 +204,17 @@ async def update_payroll(
     if "status" in update_data and update_data["status"] == "Paid":
         try:
             emp = await Employee.get(PydanticObjectId(payroll.employee_id))
-            if emp and emp.user_id:
+            emp_user_id = emp.user_id if emp else None
+            if emp_user_id is not None:
                 notif = Notification(
                     org_id=parse_object_id(payroll.org_id, "org_id"),
-                    user_id=emp.user_id,
-                    created_by=current_user.id,
+                    user_id=emp_user_id,
+                    created_by=current_user_id,
                     type="payment_received",
                     title="Salary processed",
                     message=f"Your salary for {payroll.month} has been paid! Net Amount: ₹{payroll.net_pay:,.2f}.",
                     entity_type="payroll",
-                    entity_id=payroll.id,
+                    entity_id=payroll_object_id,
                 )
                 await notif.insert()
         except Exception:
@@ -215,7 +232,7 @@ async def update_payroll(
         from models.expense import Expense
         existing_exp = await Expense.find_one({
             "related_type": "payroll",
-            "related_id": str(payroll.id),
+            "related_id": str(payroll_object_id),
             "is_deleted": False
         })
         if existing_exp:
@@ -233,20 +250,20 @@ async def update_payroll(
                 payment_method="Bank Transfer",
                 status="paid",
                 related_type="payroll",
-                related_id=str(payroll.id),
+                related_id=str(payroll_object_id),
                 description=f"Salary for {emp_name} - {payroll.month}",
-                created_by=current_user.id
+                created_by=current_user_id
             )
             await expense.insert()
     elif payroll.status == "Pending":
         from models.expense import Expense
         linked_expenses = await Expense.find({
             "related_type": "payroll",
-            "related_id": str(payroll.id)
+            "related_id": str(payroll_object_id)
         }).to_list()
         for exp in linked_expenses:
             await exp.delete()
             
-    await log_action(str(org.id) if org else None, str(current_user.id), "update", "payroll", str(payroll.id), changes=update_data)
+    await log_action(payroll.org_id, str(current_user_id), "update", "payroll", str(payroll_object_id), changes=update_data)
     
     return SuccessResponse(message="Payroll updated successfully")

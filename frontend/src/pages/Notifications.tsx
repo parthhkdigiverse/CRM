@@ -279,7 +279,7 @@ export default function Notifications() {
         {/* LEFT COLUMN: FILTERS & CATEGORIES */}
         <div className="lg:col-span-1 flex flex-col gap-6 overflow-y-auto pr-1">
           {/* Filters Card */}
-          <Card className="rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm bg-white dark:bg-gray-900">
+          <Card className="rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm bg-white dark:bg-gray-900 shrink-0 py-0 gap-0">
             <CardContent className="p-4 flex flex-col gap-1">
               <span className="text-[11px] font-bold tracking-wider text-gray-400 uppercase mb-2 block">Filter</span>
               <button 
@@ -307,7 +307,7 @@ export default function Notifications() {
           </Card>
 
           {/* Categories Card */}
-          <Card className="rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm bg-white dark:bg-gray-900">
+          <Card className="rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm bg-white dark:bg-gray-900 shrink-0 py-0 gap-0">
             <CardContent className="p-4 flex flex-col gap-1">
               <span className="text-[11px] font-bold tracking-wider text-gray-400 uppercase mb-2 block">Categories</span>
               <button
@@ -492,7 +492,7 @@ export default function Notifications() {
         <div className="lg:col-span-1 flex flex-col gap-6 overflow-y-auto pl-1">
           
           {/* Delivery Channels Card */}
-          <Card className="rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm bg-white dark:bg-gray-900 overflow-hidden">
+          <Card className="rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm bg-white dark:bg-gray-900 overflow-hidden shrink-0 py-0 gap-0">
             <div className="p-4 border-b border-gray-100 dark:border-gray-800/80 bg-gray-50/50 dark:bg-gray-950/20 flex items-center gap-2">
               <Bell className="h-4 w-4 text-purple-600" />
               <h2 className="text-sm font-bold text-gray-900 dark:text-white">Delivery channels</h2>
@@ -545,7 +545,7 @@ export default function Notifications() {
           </Card>
 
           {/* Preferences Notify me about Card */}
-          <Card className="rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm bg-white dark:bg-gray-900 overflow-hidden">
+          <Card className="rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm bg-white dark:bg-gray-900 overflow-hidden shrink-0 py-0 gap-0">
             <div className="p-4 border-b border-gray-100 dark:border-gray-800/80 bg-gray-50/50 dark:bg-gray-950/20 flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4 text-purple-600" />
               <h2 className="text-sm font-bold text-gray-900 dark:text-white">Notify me about</h2>
@@ -598,7 +598,7 @@ export default function Notifications() {
           </Card>
 
           {/* Quiet Hours Card */}
-          <Card className="rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm bg-white dark:bg-gray-900 overflow-hidden">
+          <Card className="rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm bg-white dark:bg-gray-900 overflow-hidden shrink-0 py-0 gap-0">
             <div className="p-4 border-b border-gray-100 dark:border-gray-800/80 bg-gray-50/50 dark:bg-gray-950/20 flex items-center gap-2">
               <Clock className="h-4 w-4 text-purple-600" />
               <h2 className="text-sm font-bold text-gray-900 dark:text-white">Quiet hours</h2>

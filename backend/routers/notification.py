@@ -40,101 +40,6 @@ def map_notification_to_category(notif: Notification) -> str:
     return "System"
 
 
-async def seed_demo_notifications(user_id: PydanticObjectId, org_id: PydanticObjectId):
-    """Seed 7 beautiful, realistic notifications matching the design mockup when database is empty."""
-    now = datetime.now(timezone.utc)
-    
-    demo_list = [
-        Notification(
-            org_id=org_id,
-            user_id=user_id,
-            created_by=user_id,
-            type="new_lead",
-            title="New lead from website",
-            message="Rohit Sharma submitted a contact form for Enterprise plan.",
-            entity_type="lead",
-            is_read=False,
-            is_starred=False,
-            created_at=now - timedelta(seconds=20)
-        ),
-        Notification(
-            org_id=org_id,
-            user_id=user_id,
-            created_by=user_id,
-            type="payment_received",
-            title="Payment received • ₹84,500",
-            message="Invoice #INV-2041 paid by Acme Corp via Razorpay.",
-            entity_type="invoice",
-            is_read=False,
-            is_starred=False,
-            created_at=now - timedelta(minutes=5)
-        ),
-        Notification(
-            org_id=org_id,
-            user_id=user_id,
-            created_by=user_id,
-            type="new_message",
-            title="New message in #sales",
-            message="Priya: Closed the Mehta deal — moving to onboarding 🥳",
-            entity_type="chat",
-            is_read=False,
-            is_starred=False,
-            created_at=now - timedelta(minutes=12)
-        ),
-        Notification(
-            org_id=org_id,
-            user_id=user_id,
-            created_by=user_id,
-            type="task_assigned",
-            title="Task assigned to you",
-            message="Prepare Q2 sales deck — due tomorrow 6:00 PM.",
-            entity_type="task",
-            is_read=False,
-            is_starred=False,
-            created_at=now - timedelta(hours=1)
-        ),
-        Notification(
-            org_id=org_id,
-            user_id=user_id,
-            created_by=user_id,
-            type="meeting_scheduled",
-            title="Meeting in 30 minutes",
-            message="Product review with design team — Google Meet.",
-            entity_type="meeting",
-            is_read=True,
-            is_starred=False,
-            created_at=now - timedelta(hours=1)
-        ),
-        Notification(
-            org_id=org_id,
-            user_id=user_id,
-            created_by=user_id,
-            type="inventory_low",
-            title="Low stock alert",
-            message="Item 'MacBook Pro 16' is running low in inventory (3 left).",
-            entity_type="inventory",
-            is_read=True,
-            is_starred=False,
-            created_at=now - timedelta(hours=3)
-        ),
-        Notification(
-            org_id=org_id,
-            user_id=user_id,
-            created_by=user_id,
-            type="report_generated",
-            title="Monthly Sales Report ready",
-            message="The sales performance report for last month has been generated.",
-            entity_type="report",
-            is_read=True,
-            is_starred=False,
-            created_at=now - timedelta(days=1)
-        )
-    ]
-    
-    for item in demo_list:
-        await item.insert()
-
-
 @router.get("", response_model=SuccessResponse)
 async def list_notifications(
     unread_only: bool = Query(False),
@@ -145,14 +50,6 @@ async def list_notifications(
     """Get list of notifications for the authenticated user."""
     if not current_user.org_id:
         return SuccessResponse(data=[])
-
-    # Check and seed if database is empty
-    count = await Notification.find(
-        Notification.user_id == current_user.id,
-        Notification.is_deleted == False
-    ).count()
-    if count == 0:
-        await seed_demo_notifications(current_user.id, current_user.org_id)
 
     # Base query filter
     query = {

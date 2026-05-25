@@ -44,14 +44,39 @@ from models.company import Company
 from models.contact import Contact
 import time
 
+async def get_next_project_code(org_id: PydanticObjectId) -> str:
+    """Generate the next sequential project code starting from 001 for this organization."""
+    projects = await Project.find(
+        Project.org_id == org_id,
+        Project.is_deleted == False
+    ).to_list()
+    
+    max_num = 0
+    for p in projects:
+        code = p.project_code
+        try:
+            val = int(code)
+            if val > max_num:
+                max_num = val
+        except ValueError:
+            import re
+            digits = re.findall(r'\d+', code)
+            if digits:
+                val = int(digits[-1])
+                if val > max_num:
+                    max_num = val
+                    
+    next_num = max_num + 1
+    return f"{next_num:03d}"
+
 async def sync_assigned_lead_project(lead: Lead, current_user: User, old_assigned_to: Optional[PydanticObjectId] = None) -> None:
-    """Ensure an assigned lead is visible in Projects if status != 'new'."""
+    """Ensure an assigned lead is visible in Projects."""
     existing_project = await Project.find_one(
         Project.linked_lead_id == lead.id,
         Project.org_id == lead.org_id
     )
 
-    should_have_project = lead.assigned_to is not None and lead.status != "new"
+    should_have_project = lead.assigned_to is not None
 
     if not should_have_project:
         # If it shouldn't have a project, soft-delete it if it exists
@@ -92,7 +117,7 @@ async def sync_assigned_lead_project(lead: Lead, current_user: User, old_assigne
     else:
         # Create a new project
         title = f"Project: {client_name}" if lead.status == "converted" else f"Lead: {lead.name}"
-        project_code = f"P-{int(time.time())}" if lead.status == "converted" else f"L-{str(lead.id)[-6:].upper()}"
+        project_code = await get_next_project_code(lead.org_id)
         
         new_project = Project(
             project_code=project_code,

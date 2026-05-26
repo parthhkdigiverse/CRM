@@ -16,12 +16,15 @@ import {
   TrendingUp,
   Receipt,
   Users,
+  UserPlus,
   Building2,
   Folder,
   CheckSquare,
   Package,
   ReceiptText,
-  CalendarDays
+  FileText,
+  CalendarDays,
+  CheckCircle
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
@@ -53,10 +56,18 @@ const quickCreateItems = [
   { name: 'Task', href: '/tasks', icon: CheckSquare, allowedRoles: ['super_admin', 'admin', 'hr', 'employee'], category: 'Operations' },
   { name: 'Inventory Item', href: '/inventory', icon: Package, allowedRoles: ['super_admin', 'admin'], category: 'Inventory & Finance' },
   { name: 'Expense Claim', href: '/expenses', icon: ReceiptText, allowedRoles: ['super_admin', 'admin'], category: 'Inventory & Finance' },
+  { name: 'Manage Employees', href: '/employees', icon: Users, allowedRoles: ['super_admin', 'admin', 'hr'], category: 'HR' },
+  { name: 'View Attendance', href: '/attendance', icon: CalendarDays, allowedRoles: ['super_admin', 'admin', 'hr'], category: 'HR' },
+  { name: 'Onboard User', href: '/employees', icon: UserPlus, allowedRoles: ['super_admin', 'admin', 'hr'], category: 'HR' },
+  { name: 'Run Payroll', href: '/payroll', icon: FileText, allowedRoles: ['super_admin', 'admin', 'hr'], category: 'HR' },
   { name: 'Leave Request', href: '/leaves', icon: CalendarDays, allowedRoles: ['super_admin', 'admin', 'hr', 'employee'], category: 'HR' },
+  { name: 'My Tasks', href: '/tasks', icon: CheckCircle, allowedRoles: ['employee'], category: 'Employee' },
+  { name: 'My Targets', href: '/targets', icon: Target, allowedRoles: ['employee'], category: 'Employee' },
+  { name: 'My Projects', href: '/projects', icon: Folder, allowedRoles: ['employee'], category: 'Employee' },
+  { name: 'Check In/Out', href: '/attendance', icon: CalendarDays, allowedRoles: ['employee'], category: 'Employee' },
 ];
 
-const categories = ['Sales & CRM', 'Contacts', 'Operations', 'Inventory & Finance', 'HR'];
+const categories = ['Sales & CRM', 'Contacts', 'Operations', 'Inventory & Finance', 'HR', 'Employee'];
 
 export default function Topbar({ onMenuClick }: TopbarProps) {
   const { user, organization, logout } = useAuthStore();

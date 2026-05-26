@@ -147,27 +147,7 @@ export default function HRDashboard() {
         </Card>
       </div>
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {[
-          { label: 'Manage Employees', icon: Users, color: 'text-blue-500', path: '/employees' },
-          { label: 'View Attendance', icon: CalendarDays, color: 'text-orange-500', path: '/attendance' },
-          { label: 'Onboard User', icon: UserPlus, color: 'text-emerald-500', path: '/employees' },
-          { label: 'Run Payroll', icon: FileText, color: 'text-purple-500', path: '/payroll' },
-        ].map((action, i) => (
-          <div 
-            key={i} 
-            onClick={() => window.location.pathname = action.path}
-            className="group relative flex items-center gap-3 p-4 bg-white dark:bg-gray-950 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm cursor-pointer hover:border-purple-200 dark:hover:border-purple-900/50 hover:shadow-md transition-all"
-          >
-            <div className={`p-2 rounded-lg bg-gray-50 dark:bg-gray-900 ${action.color}`}>
-              <action.icon className="h-5 w-5" />
-            </div>
-            <span className="font-semibold text-gray-700 dark:text-gray-300">{action.label}</span>
-            <ArrowUpRight className="absolute right-4 h-4 w-4 text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity" />
-          </div>
-        ))}
-      </div>
+
 
     </div>
   );

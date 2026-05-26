@@ -60,7 +60,6 @@ const navigation = [
   {
     title: 'PEOPLE',
     items: [
-      { name: 'Messages', href: '/chat', icon: MessageSquare, isComingSoon: false, allowedRoles: ['super_admin', 'admin', 'hr', 'employee'] },
       { name: 'HRMS', href: '/employees', icon: Users, isComingSoon: false, allowedRoles: ['super_admin', 'admin', 'hr'] },
       { name: 'Attendance', href: '/attendance', icon: Clock, isComingSoon: false, allowedRoles: ['super_admin', 'admin', 'hr', 'employee'] },
       { name: 'Leaves', href: '/leaves', icon: CalendarDays, isComingSoon: false, allowedRoles: ['super_admin', 'admin', 'hr', 'employee'] },
@@ -172,6 +171,21 @@ export default function Sidebar() {
         >
           <Bot className="h-4 w-4 shrink-0" />
           AI Assistant
+        </NavLink>
+
+        <NavLink
+          to="/chat"
+          className={({ isActive }) =>
+            cn(
+              "flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200",
+              isActive 
+                ? "bg-white dark:bg-gray-900 text-gray-900 dark:text-white shadow-sm border border-gray-200/60 dark:border-gray-800" 
+                : "text-gray-600 dark:text-gray-400 hover:bg-gray-200/50 dark:hover:bg-gray-900/50 hover:text-gray-900 dark:hover:text-gray-100 border border-transparent"
+            )
+          }
+        >
+          <MessageSquare className="h-4 w-4 shrink-0" />
+          Messages
         </NavLink>
         
         {['super_admin', 'admin'].includes(userRole) && (

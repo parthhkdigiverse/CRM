@@ -11,7 +11,17 @@ import {
   ChevronDown,
   LogOut,
   User,
-  Settings
+  Settings,
+  Target,
+  TrendingUp,
+  Receipt,
+  Users,
+  Building2,
+  Folder,
+  CheckSquare,
+  Package,
+  ReceiptText,
+  CalendarDays
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
@@ -31,6 +41,22 @@ import { toast } from 'sonner';
 interface TopbarProps {
   onMenuClick: () => void;
 }
+
+const quickCreateItems = [
+  { name: 'Lead', href: '/leads', icon: Target, allowedRoles: ['super_admin', 'admin', 'hr'], category: 'Sales & CRM' },
+  { name: 'Deal', href: '/crm', icon: TrendingUp, allowedRoles: ['super_admin', 'admin', 'hr'], category: 'Sales & CRM' },
+  { name: 'Sales Log', href: '/sales', icon: TrendingUp, allowedRoles: ['super_admin', 'admin'], category: 'Sales & CRM' },
+  { name: 'Invoice', href: '/invoices', icon: Receipt, allowedRoles: ['super_admin', 'admin'], category: 'Sales & CRM' },
+  { name: 'Contact', href: '/contacts', icon: Users, allowedRoles: ['super_admin', 'admin', 'hr', 'employee'], category: 'Contacts' },
+  { name: 'Company', href: '/companies', icon: Building2, allowedRoles: ['super_admin', 'admin', 'hr', 'employee'], category: 'Contacts' },
+  { name: 'Project', href: '/projects', icon: Folder, allowedRoles: ['super_admin', 'admin', 'hr', 'employee'], category: 'Operations' },
+  { name: 'Task', href: '/tasks', icon: CheckSquare, allowedRoles: ['super_admin', 'admin', 'hr', 'employee'], category: 'Operations' },
+  { name: 'Inventory Item', href: '/inventory', icon: Package, allowedRoles: ['super_admin', 'admin'], category: 'Inventory & Finance' },
+  { name: 'Expense Claim', href: '/expenses', icon: ReceiptText, allowedRoles: ['super_admin', 'admin'], category: 'Inventory & Finance' },
+  { name: 'Leave Request', href: '/leaves', icon: CalendarDays, allowedRoles: ['super_admin', 'admin', 'hr', 'employee'], category: 'HR' },
+];
+
+const categories = ['Sales & CRM', 'Contacts', 'Operations', 'Inventory & Finance', 'HR'];
 
 export default function Topbar({ onMenuClick }: TopbarProps) {
   const { user, organization, logout } = useAuthStore();
@@ -106,10 +132,51 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
            <ChevronDown className="h-3 w-3 text-gray-500" />
         </div>
 
-        {/* Quick Create Button */}
-        <Button className="hidden sm:flex bg-purple-600 hover:bg-purple-700 text-white rounded-xl h-9 px-4">
-          <span className="text-lg mr-1 mb-0.5">+</span> Quick Create
-        </Button>
+        {/* Quick Create Dropdown */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button className="hidden sm:flex bg-purple-600 hover:bg-purple-700 text-white rounded-xl h-9 px-4 gap-1">
+              <span className="text-lg mb-0.5">+</span> Quick Create
+              <ChevronDown className="h-3 w-3 opacity-80 ml-0.5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56 rounded-xl mt-1 max-h-[80vh] overflow-y-auto">
+            {(() => {
+              const userRole = user?.role || 'employee';
+              const allowedItems = quickCreateItems.filter(item => item.allowedRoles.includes(userRole));
+              
+              let renderedIdx = 0;
+              return categories.map((cat) => {
+                const itemsInCat = allowedItems.filter(item => item.category === cat);
+                if (itemsInCat.length === 0) return null;
+                const isFirst = renderedIdx === 0;
+                renderedIdx++;
+                
+                return (
+                  <div key={cat}>
+                    {!isFirst && <DropdownMenuSeparator />}
+                    <DropdownMenuLabel className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider px-2 py-1">
+                      {cat}
+                    </DropdownMenuLabel>
+                    {itemsInCat.map(item => {
+                      const Icon = item.icon;
+                      return (
+                        <DropdownMenuItem
+                          key={item.name}
+                          onClick={() => navigate(item.href)}
+                          className="cursor-pointer flex items-center gap-2 py-1.5"
+                        >
+                          <Icon className="h-4 w-4 text-gray-500" />
+                          <span>{item.name}</span>
+                        </DropdownMenuItem>
+                      );
+                    })}
+                  </div>
+                );
+              });
+            })()}
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         {/* Icons */}
         <Button variant="ghost" size="icon" className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 rounded-full h-9 w-9" onClick={() => navigate('/chat')}>

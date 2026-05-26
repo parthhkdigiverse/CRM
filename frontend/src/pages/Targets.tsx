@@ -16,17 +16,29 @@ import { toast } from 'sonner';
 import { apiClient } from '@/lib/axios';
 import FormDrawer, { FormField, ChipSelect, inputClass, selectClass, textareaClass } from '@/components/FormDrawer';
 import MoreDetails from '@/components/MoreDetails';
+import { useAuthStore } from '@/store/authStore';
 
 interface TargetItem {
   id: string;
   title: string;
   owner?: string;
+  owner_id?: string;
+  owner_name?: string;
   department?: string;
   period?: string;
   target_value: number;
   current_value: number;
   unit: string;
   status: string;
+}
+
+interface EmployeeOption {
+  id: string;
+  user_id?: string;
+  name: string;
+  email: string;
+  role?: string;
+  department?: string;
 }
 
 const targetTypes = [
@@ -37,8 +49,20 @@ const targetTypes = [
   { value: 'task', label: 'Task' },
 ];
 
+const unwrapList = <T,>(payload: any): T[] => {
+  const data = payload?.data;
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.data)) return data.data;
+  return [];
+};
+
 export default function Targets() {
+  const { user } = useAuthStore();
+  const isEmployee = user?.role === 'employee';
+  const canManageTargets = user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'hr';
+
   const [targets, setTargets] = useState<TargetItem[]>([]);
+  const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<TargetItem | null>(null);
@@ -56,17 +80,33 @@ export default function Targets() {
   const [unit, setUnit] = useState('₹');
   const [period, setPeriod] = useState('');
 
+  const assignableEmployees = employees.filter((emp) => {
+    const role = emp.role?.toLowerCase();
+    if (!emp.user_id) return false;
+    if (user?.role === 'hr') return role === 'employee';
+    if (user?.role === 'admin' || user?.role === 'super_admin') return role === 'hr' || role === 'employee';
+    return false;
+  });
+
   const fetchTargets = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await apiClient.get('/targets', { params: { per_page: 50 } });
-      setTargets(res.data.data || []);
+      const requests: Promise<any>[] = [
+        apiClient.get('/targets', { params: { per_page: 50 } }),
+      ];
+      if (canManageTargets) {
+        requests.push(apiClient.get('/employees', { params: { per_page: 100 } }));
+      }
+
+      const [targetsRes, employeesRes] = await Promise.all(requests);
+      setTargets(unwrapList<TargetItem>(targetsRes.data));
+      setEmployees(employeesRes ? unwrapList<EmployeeOption>(employeesRes.data) : []);
     } catch (err) {
       console.error('Failed to fetch targets:', err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [canManageTargets]);
 
   useEffect(() => {
     fetchTargets();
@@ -90,14 +130,16 @@ export default function Targets() {
   };
 
   const openCreateDrawer = () => {
+    if (!canManageTargets) return;
     resetForm();
     setDrawerOpen(true);
   };
 
   const openEditDrawer = (t: TargetItem) => {
+    if (!canManageTargets) return;
     setEditTarget(t);
     setTitle(t.title);
-    setOwner(t.owner || '');
+    setOwner(t.owner_id || t.owner || '');
     setTargetType(t.department || 'sales');
     setTargetValue(String(t.target_value));
     setEndDate('');
@@ -111,12 +153,13 @@ export default function Targets() {
 
   const submitForm = async (): Promise<boolean> => {
     if (!title.trim()) { toast.error('Target Name is required'); return false; }
+    if (!owner) { toast.error('Assign this target to an employee or HR'); return false; }
 
     try {
       setSubmitLoading(true);
       const payload = {
         title: title.trim(),
-        owner: owner.trim() || undefined,
+        owner,
         department: targetType,
         period: period.trim() || undefined,
         target_value: parseFloat(targetValue) || 0,
@@ -212,9 +255,11 @@ export default function Targets() {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Targets & KPIs</h1>
           <p className="text-sm text-gray-500 mt-1">Goals, OKRs and achievement tracking.</p>
         </div>
-        <Button onClick={openCreateDrawer} className="bg-purple-600 hover:bg-purple-700 text-white rounded-xl h-9 px-4">
-          <Plus className="h-4 w-4 mr-2" /> New Target
-        </Button>
+        {canManageTargets && (
+          <Button onClick={openCreateDrawer} className="bg-purple-600 hover:bg-purple-700 text-white rounded-xl h-9 px-4">
+            <Plus className="h-4 w-4 mr-2" /> New Target
+          </Button>
+        )}
       </div>
 
       {/* Stats */}
@@ -242,7 +287,9 @@ export default function Targets() {
           <CardContent className="p-16 text-center">
             <Target className="h-12 w-12 text-gray-300 mx-auto mb-3" />
             <p className="text-gray-500 font-medium">No targets yet</p>
-            <p className="text-xs text-gray-400 mt-1">Click "+ New Target" to set your first goal.</p>
+            <p className="text-xs text-gray-400 mt-1">
+              {isEmployee ? 'Assigned goals will appear here.' : 'Click "+ New Target" to set your first goal.'}
+            </p>
           </CardContent>
         </Card>
       ) : (
@@ -252,7 +299,10 @@ export default function Targets() {
             return (
               <Card
                 key={t.id}
-                className="border-0 shadow-sm rounded-2xl bg-white dark:bg-gray-950 hover:shadow-md transition-shadow cursor-pointer group"
+                className={cn(
+                  'border-0 shadow-sm rounded-2xl bg-white dark:bg-gray-950 transition-shadow group',
+                  canManageTargets ? 'hover:shadow-md cursor-pointer' : 'cursor-default'
+                )}
                 onClick={() => openEditDrawer(t)}
               >
                 <CardContent className="p-5">
@@ -290,6 +340,7 @@ export default function Targets() {
       )}
 
       {/* Create/Edit Drawer */}
+      {canManageTargets && (
       <FormDrawer
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
@@ -307,8 +358,15 @@ export default function Targets() {
           <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Q2 Revenue" className={inputClass} autoFocus />
         </FormField>
 
-        <FormField label="Employee / Owner">
-          <Input value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="Person or team" className={inputClass} />
+        <FormField label="Assign To" required>
+          <select value={owner} onChange={(e) => setOwner(e.target.value)} className={selectClass}>
+            <option value="">Select assignee</option>
+            {assignableEmployees.map((emp) => (
+              <option key={emp.user_id} value={emp.user_id}>
+                {emp.name} ({emp.role || 'employee'})
+              </option>
+            ))}
+          </select>
         </FormField>
 
         <FormField label="Target Type">
@@ -371,6 +429,7 @@ export default function Targets() {
           </div>
         )}
       </FormDrawer>
+      )}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useEffect } from 'react';
 import { useAuthStore } from './store/authStore';
+import { useFeatureStore } from './store/featureStore';
 import { Toaster } from 'sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { apiClient } from './lib/axios';
@@ -83,6 +84,37 @@ const RoleProtectedRoute = ({ children, roles }: { children: React.ReactNode, ro
   }
   
   if (user && !roles.includes(user.role)) {
+    return <Navigate to="/access-denied" replace />;
+  }
+  return <>{children}</>;
+};
+
+/**
+ * Governs access to a feature-gated module.
+ * - admin / super_admin: always allowed (managers see everything).
+ * - hr / employee: the org's feature matrix is authoritative (grant or hide).
+ */
+const FeatureProtectedRoute = ({ children, feature }: { children: React.ReactNode, feature: string }) => {
+  const { user } = useAuthStore();
+  // Subscribe to the matrix data so this guard re-evaluates when it changes.
+  useFeatureStore((s) => s.featureAccess);
+  const isEnabled = useFeatureStore((s) => s.isEnabled);
+  const loaded = useFeatureStore((s) => s.loaded);
+  const role = user?.role;
+
+  if (role === 'admin' || role === 'super_admin') {
+    return <>{children}</>;
+  }
+
+  // Wait until the matrix is loaded so we don't flash-redirect on first paint.
+  if (!loaded) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-purple-600 border-t-transparent"></div>
+      </div>
+    );
+  }
+  if (!isEnabled(role, feature)) {
     return <Navigate to="/access-denied" replace />;
   }
   return <>{children}</>;
@@ -196,82 +228,34 @@ function App() {
             } />
             <Route path="access-denied" element={<AccessDenied />} />
             
-            <Route path="leads" element={
-              <RoleProtectedRoute roles={['super_admin', 'admin', 'hr']}>
-                <Leads />
-              </RoleProtectedRoute>
-            } />
-            <Route path="crm" element={
-              <RoleProtectedRoute roles={['super_admin', 'admin', 'hr']}>
-                <Deals />
-              </RoleProtectedRoute>
-            } />
-            <Route path="sales" element={
-              <RoleProtectedRoute roles={['super_admin', 'admin']}>
-                <Sales />
-              </RoleProtectedRoute>
-            } />
-            <Route path="inventory" element={
-              <RoleProtectedRoute roles={['super_admin', 'admin']}>
-                <Inventory />
-              </RoleProtectedRoute>
-            } />
-            <Route path="employees" element={
-              <RoleProtectedRoute roles={['super_admin', 'admin', 'hr']}>
-                <Employees />
-              </RoleProtectedRoute>
-            } />
-            <Route path="payroll" element={
-              <RoleProtectedRoute roles={['super_admin', 'admin', 'hr', 'employee']}>
-                <Payroll />
-              </RoleProtectedRoute>
-            } />
-            <Route path="invoices" element={
-              <RoleProtectedRoute roles={['super_admin', 'admin']}>
-                <Invoices />
-              </RoleProtectedRoute>
-            } />
-            <Route path="finance" element={
-              <RoleProtectedRoute roles={['super_admin', 'admin']}>
-                <Finance />
-              </RoleProtectedRoute>
-            } />
-            <Route path="expenses" element={
-              <RoleProtectedRoute roles={['super_admin', 'admin']}>
-                <Expenses />
-              </RoleProtectedRoute>
-            } />
-            <Route path="reports" element={
-              <RoleProtectedRoute roles={['super_admin', 'admin']}>
-                <Reports />
-              </RoleProtectedRoute>
-            } />
+            <Route path="leads" element={<FeatureProtectedRoute feature="leads"><Leads /></FeatureProtectedRoute>} />
+            <Route path="crm" element={<FeatureProtectedRoute feature="crm"><Deals /></FeatureProtectedRoute>} />
+            <Route path="sales" element={<FeatureProtectedRoute feature="sales"><Sales /></FeatureProtectedRoute>} />
+            <Route path="inventory" element={<FeatureProtectedRoute feature="inventory"><Inventory /></FeatureProtectedRoute>} />
+            <Route path="employees" element={<FeatureProtectedRoute feature="employees"><Employees /></FeatureProtectedRoute>} />
+            <Route path="payroll" element={<FeatureProtectedRoute feature="payroll"><Payroll /></FeatureProtectedRoute>} />
+            <Route path="invoices" element={<FeatureProtectedRoute feature="invoices"><Invoices /></FeatureProtectedRoute>} />
+            <Route path="finance" element={<FeatureProtectedRoute feature="finance"><Finance /></FeatureProtectedRoute>} />
+            <Route path="expenses" element={<FeatureProtectedRoute feature="expenses"><Expenses /></FeatureProtectedRoute>} />
+            <Route path="reports" element={<FeatureProtectedRoute feature="reports"><Reports /></FeatureProtectedRoute>} />
             <Route path="settings" element={
               <RoleProtectedRoute roles={['super_admin', 'admin', 'hr', 'employee']}>
                 <Settings />
               </RoleProtectedRoute>
             } />
-            <Route path="calendar" element={
-              <RoleProtectedRoute roles={['super_admin', 'admin', 'hr', 'employee']}>
-                <Calendar />
-              </RoleProtectedRoute>
-            } />
-            <Route path="documents" element={
-              <RoleProtectedRoute roles={['super_admin', 'admin', 'hr', 'employee']}>
-                <Documents />
-              </RoleProtectedRoute>
-            } />
+            <Route path="calendar" element={<FeatureProtectedRoute feature="calendar"><Calendar /></FeatureProtectedRoute>} />
+            <Route path="documents" element={<FeatureProtectedRoute feature="documents"><Documents /></FeatureProtectedRoute>} />
 
             {/* Common Routes */}
-            <Route path="contacts" element={<Contacts />} />
-            <Route path="companies" element={<Companies />} />
-            <Route path="chat" element={<Chat />} />
-            <Route path="projects" element={<Projects />} />
-            <Route path="tasks" element={<Tasks />} />
-            <Route path="attendance" element={<Attendance />} />
-            <Route path="leaves" element={<Leaves />} />
-            <Route path="targets" element={<Targets />} />
-            <Route path="ai" element={<AIAssistant />} />
+            <Route path="contacts" element={<FeatureProtectedRoute feature="contacts"><Contacts /></FeatureProtectedRoute>} />
+            <Route path="companies" element={<FeatureProtectedRoute feature="companies"><Companies /></FeatureProtectedRoute>} />
+            <Route path="chat" element={<FeatureProtectedRoute feature="chat"><Chat /></FeatureProtectedRoute>} />
+            <Route path="projects" element={<FeatureProtectedRoute feature="projects"><Projects /></FeatureProtectedRoute>} />
+            <Route path="tasks" element={<FeatureProtectedRoute feature="tasks"><Tasks /></FeatureProtectedRoute>} />
+            <Route path="attendance" element={<FeatureProtectedRoute feature="attendance"><Attendance /></FeatureProtectedRoute>} />
+            <Route path="leaves" element={<FeatureProtectedRoute feature="leaves"><Leaves /></FeatureProtectedRoute>} />
+            <Route path="targets" element={<FeatureProtectedRoute feature="targets"><Targets /></FeatureProtectedRoute>} />
+            <Route path="ai" element={<FeatureProtectedRoute feature="ai"><AIAssistant /></FeatureProtectedRoute>} />
             <Route path="notifications" element={<Notifications />} />
           </Route>
         </Routes>

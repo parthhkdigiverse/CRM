@@ -136,6 +136,13 @@ async def update_project(
     from middleware.rbac import get_permission
     perm = get_permission(current_user.role, "projects")
 
+    # Once a project is completed, only admin/super_admin may edit it.
+    if project.status == "completed" and current_user.role not in ("admin", "super_admin"):
+        raise HTTPException(
+            status_code=403,
+            detail="This project is completed and can only be edited by an admin.",
+        )
+
     update_data = data.model_dump(exclude_unset=True)
 
     if perm == "own":

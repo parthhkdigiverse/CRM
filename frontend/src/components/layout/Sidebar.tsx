@@ -24,6 +24,7 @@ import {
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useAuthStore } from '@/store/authStore';
+import { useFeatureStore } from '@/store/featureStore';
 
 const navigation = [
   {
@@ -35,51 +36,55 @@ const navigation = [
   {
     title: 'BUSINESS',
     items: [
-      { name: 'Leads', href: '/leads', icon: Target, allowedRoles: ['super_admin', 'admin', 'hr'] },
-      { name: 'CRM', href: '/crm', icon: User, allowedRoles: ['super_admin', 'admin', 'hr'] },
-      { name: 'Sales', href: '/sales', icon: TrendingUp, allowedRoles: ['super_admin', 'admin'] },
-      { name: 'Inventory', href: '/inventory', icon: Package, allowedRoles: ['super_admin', 'admin'] },
+      { name: 'Leads', href: '/leads', icon: Target, feature: 'leads', allowedRoles: ['super_admin', 'admin', 'hr'] },
+      { name: 'CRM', href: '/crm', icon: User, feature: 'crm', allowedRoles: ['super_admin', 'admin', 'hr'] },
+      { name: 'Sales', href: '/sales', icon: TrendingUp, feature: 'sales', allowedRoles: ['super_admin', 'admin'] },
+      { name: 'Inventory', href: '/inventory', icon: Package, feature: 'inventory', allowedRoles: ['super_admin', 'admin'] },
     ]
   },
   {
     title: 'CONTACTS',
     items: [
-      { name: 'Contacts', href: '/contacts', icon: Users, allowedRoles: ['super_admin', 'admin', 'hr', 'employee'] },
-      { name: 'Companies', href: '/companies', icon: Building2, allowedRoles: ['super_admin', 'admin', 'hr', 'employee'] },
+      { name: 'Contacts', href: '/contacts', icon: Users, feature: 'contacts', allowedRoles: ['super_admin', 'admin', 'hr', 'employee'] },
+      { name: 'Companies', href: '/companies', icon: Building2, feature: 'companies', allowedRoles: ['super_admin', 'admin', 'hr', 'employee'] },
     ]
   },
   {
     title: 'OPERATIONS',
     items: [
-      { name: 'Projects', href: '/projects', icon: Folder, isComingSoon: false, allowedRoles: ['super_admin', 'admin', 'hr', 'employee'] },
-      { name: 'Tasks', href: '/tasks', icon: CheckSquare, isComingSoon: false, allowedRoles: ['super_admin', 'admin', 'hr', 'employee'] },
-      { name: 'Calendar', href: '/calendar', icon: CalendarDays, isComingSoon: false, allowedRoles: ['super_admin', 'admin', 'hr', 'employee'] },
-      { name: 'Documents', href: '/documents', icon: FileText, isComingSoon: false, allowedRoles: ['super_admin', 'admin', 'hr', 'employee'] },
+      { name: 'Projects', href: '/projects', icon: Folder, feature: 'projects', isComingSoon: false, allowedRoles: ['super_admin', 'admin', 'hr', 'employee'] },
+      { name: 'Tasks', href: '/tasks', icon: CheckSquare, feature: 'tasks', isComingSoon: false, allowedRoles: ['super_admin', 'admin', 'hr', 'employee'] },
+      { name: 'Calendar', href: '/calendar', icon: CalendarDays, feature: 'calendar', isComingSoon: false, allowedRoles: ['super_admin', 'admin', 'hr', 'employee'] },
+      { name: 'Documents', href: '/documents', icon: FileText, feature: 'documents', isComingSoon: false, allowedRoles: ['super_admin', 'admin', 'hr', 'employee'] },
     ]
   },
   {
     title: 'PEOPLE',
     items: [
-      { name: 'HRMS', href: '/employees', icon: Users, isComingSoon: false, allowedRoles: ['super_admin', 'admin', 'hr'] },
-      { name: 'Attendance', href: '/attendance', icon: Clock, isComingSoon: false, allowedRoles: ['super_admin', 'admin', 'hr', 'employee'] },
-      { name: 'Leaves', href: '/leaves', icon: CalendarDays, isComingSoon: false, allowedRoles: ['super_admin', 'admin', 'hr', 'employee'] },
-      { name: 'Payroll', href: '/payroll', icon: CreditCard, isComingSoon: false, allowedRoles: ['super_admin', 'admin', 'hr', 'employee'] },
-      { name: 'Targets', href: '/targets', icon: Target, isComingSoon: false, allowedRoles: ['super_admin', 'admin', 'hr', 'employee'] },
+      { name: 'HRMS', href: '/employees', icon: Users, feature: 'employees', isComingSoon: false, allowedRoles: ['super_admin', 'admin', 'hr'] },
+      { name: 'Attendance', href: '/attendance', icon: Clock, feature: 'attendance', isComingSoon: false, allowedRoles: ['super_admin', 'admin', 'hr', 'employee'] },
+      { name: 'Leaves', href: '/leaves', icon: CalendarDays, feature: 'leaves', isComingSoon: false, allowedRoles: ['super_admin', 'admin', 'hr', 'employee'] },
+      { name: 'Payroll', href: '/payroll', icon: CreditCard, feature: 'payroll', isComingSoon: false, allowedRoles: ['super_admin', 'admin', 'hr', 'employee'] },
+      { name: 'Targets', href: '/targets', icon: Target, feature: 'targets', isComingSoon: false, allowedRoles: ['super_admin', 'admin', 'hr', 'employee'] },
     ]
   },
   {
     title: 'FINANCE & REPORTS',
     items: [
-      { name: 'Finance', href: '/finance', icon: CreditCard, isComingSoon: false, allowedRoles: ['super_admin', 'admin'] },
-      { name: 'Expenses', href: '/expenses', icon: ReceiptText, isComingSoon: false, allowedRoles: ['super_admin', 'admin'] },
-      { name: 'Reports', href: '/reports', icon: TrendingUp, isComingSoon: false, allowedRoles: ['super_admin', 'admin'] },
-      { name: 'Invoices', href: '/invoices', icon: Receipt, isComingSoon: false, allowedRoles: ['super_admin', 'admin'] },
+      { name: 'Finance', href: '/finance', icon: CreditCard, feature: 'finance', isComingSoon: false, allowedRoles: ['super_admin', 'admin'] },
+      { name: 'Expenses', href: '/expenses', icon: ReceiptText, feature: 'expenses', isComingSoon: false, allowedRoles: ['super_admin', 'admin'] },
+      { name: 'Reports', href: '/reports', icon: TrendingUp, feature: 'reports', isComingSoon: false, allowedRoles: ['super_admin', 'admin'] },
+      { name: 'Invoices', href: '/invoices', icon: Receipt, feature: 'invoices', isComingSoon: false, allowedRoles: ['super_admin', 'admin'] },
     ]
   }
 ];
 
 export default function Sidebar() {
   const { user } = useAuthStore();
+  // Subscribe to the matrix DATA (not just the isEnabled fn) so the sidebar
+  // re-renders when feature access changes after an admin saves.
+  useFeatureStore((s) => s.featureAccess);
+  const isEnabled = useFeatureStore((s) => s.isEnabled);
   const userRole = (user?.role as any) || 'employee';
 
   if (userRole === 'super_admin') {
@@ -105,8 +110,15 @@ export default function Sidebar() {
       <div className="flex-1 overflow-y-auto py-4 scrollbar-thin">
         <nav className="space-y-6 px-4">
           {navigation.map((section) => {
-            // Filter items based on user role
-            const visibleItems = section.items.filter(item => item.allowedRoles.includes(userRole));
+            // For admin/super_admin: static role list governs visibility.
+            // For hr/employee: the org's feature matrix is authoritative (it can
+            // both grant and hide), so we only consult isEnabled for those roles.
+            const isManager = userRole === 'admin' || userRole === 'super_admin';
+            const visibleItems = section.items.filter((item: any) => {
+              if (isManager) return item.allowedRoles.includes(userRole);
+              if (!item.feature) return item.allowedRoles.includes(userRole); // Dashboard etc.
+              return isEnabled(userRole, item.feature);
+            });
             
             if (visibleItems.length === 0) return null;
 
@@ -158,6 +170,7 @@ export default function Sidebar() {
       
       {/* Bottom Footer Area */}
       <div className="p-4 border-t border-gray-200 dark:border-gray-800 shrink-0 space-y-1">
+        {isEnabled(userRole, 'ai') && (
         <NavLink
           to="/ai"
           className={({ isActive }) =>
@@ -172,7 +185,9 @@ export default function Sidebar() {
           <Bot className="h-4 w-4 shrink-0" />
           AI Assistant
         </NavLink>
+        )}
 
+        {isEnabled(userRole, 'chat') && (
         <NavLink
           to="/chat"
           className={({ isActive }) =>
@@ -187,6 +202,7 @@ export default function Sidebar() {
           <MessageSquare className="h-4 w-4 shrink-0" />
           Messages
         </NavLink>
+        )}
         
         {['super_admin', 'admin'].includes(userRole) && (
           <NavLink

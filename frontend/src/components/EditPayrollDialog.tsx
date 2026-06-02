@@ -16,24 +16,24 @@ interface EditPayrollDialogProps {
 export default function EditPayrollDialog({ open, onOpenChange, payroll, onUpdated }: EditPayrollDialogProps) {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
-    workingDays: 0,
-    workedDays: 0,
-    leaves: 0,
-    basic: 0,
-    bonus: 0,
-    deductions: 0,
+    workingDays: '0',
+    workedDays: '0',
+    leaves: '0',
+    basic: '0',
+    bonus: '0',
+    deductions: '0',
     status: 'Pending'
   });
 
   useEffect(() => {
     if (open && payroll) {
       setFormData({
-        workingDays: payroll.workingDays || 0,
-        workedDays: payroll.workedDays || 0,
-        leaves: payroll.leaves || 0,
-        basic: payroll.basic || 0,
-        bonus: payroll.bonus || 0,
-        deductions: payroll.deductions || 0,
+        workingDays: String(payroll.workingDays ?? 0),
+        workedDays: String(payroll.workedDays ?? 0),
+        leaves: String(payroll.leaves ?? 0),
+        basic: String(payroll.basic ?? 0),
+        bonus: String(payroll.bonus ?? 0),
+        deductions: String(payroll.deductions ?? 0),
         status: payroll.status || 'Pending'
       });
     }
@@ -41,20 +41,24 @@ export default function EditPayrollDialog({ open, onOpenChange, payroll, onUpdat
 
   if (!open || !payroll) return null;
 
-  // Auto calculate net pay for display
-  const netPay = (Number(formData.basic) + Number(formData.bonus)) - Number(formData.deductions);
+  // Parse strings safely so decimals type freely (e.g. "100." while typing).
+  const num = (v: string) => {
+    const n = parseFloat(v);
+    return Number.isFinite(n) ? n : 0;
+  };
+  const netPay = (num(formData.basic) + num(formData.bonus)) - num(formData.deductions);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       setLoading(true);
       await apiClient.put(`/payroll/${payroll.id}`, {
-        working_days: Number(formData.workingDays),
-        worked_days: Number(formData.workedDays),
-        leaves: Number(formData.leaves),
-        basic: Number(formData.basic),
-        bonus: Number(formData.bonus),
-        deductions: Number(formData.deductions),
+        working_days: Math.round(num(formData.workingDays)),
+        worked_days: Math.round(num(formData.workedDays)),
+        leaves: Math.round(num(formData.leaves)),
+        basic: num(formData.basic),
+        bonus: num(formData.bonus),
+        deductions: num(formData.deductions),
         net_pay: netPay,
         status: formData.status
       });
@@ -95,8 +99,9 @@ export default function EditPayrollDialog({ open, onOpenChange, payroll, onUpdat
                 <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Working Days</label>
                 <input
                   type="number"
+                  inputMode="numeric"
                   value={formData.workingDays}
-                  onChange={(e) => setFormData({ ...formData, workingDays: e.target.valueAsNumber || 0 })}
+                  onChange={(e) => setFormData({ ...formData, workingDays: e.target.value })}
                   className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all outline-none text-sm"
                 />
               </div>
@@ -104,8 +109,9 @@ export default function EditPayrollDialog({ open, onOpenChange, payroll, onUpdat
                 <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Worked Days</label>
                 <input
                   type="number"
+                  inputMode="numeric"
                   value={formData.workedDays}
-                  onChange={(e) => setFormData({ ...formData, workedDays: e.target.valueAsNumber || 0 })}
+                  onChange={(e) => setFormData({ ...formData, workedDays: e.target.value })}
                   className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all outline-none text-sm"
                 />
               </div>
@@ -113,8 +119,9 @@ export default function EditPayrollDialog({ open, onOpenChange, payroll, onUpdat
                 <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Leaves</label>
                 <input
                   type="number"
+                  inputMode="numeric"
                   value={formData.leaves}
-                  onChange={(e) => setFormData({ ...formData, leaves: e.target.valueAsNumber || 0 })}
+                  onChange={(e) => setFormData({ ...formData, leaves: e.target.value })}
                   className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all outline-none text-sm"
                 />
               </div>
@@ -125,8 +132,10 @@ export default function EditPayrollDialog({ open, onOpenChange, payroll, onUpdat
                 <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Basic Salary (₹)</label>
                 <input
                   type="number"
+                  inputMode="decimal"
+                  step="0.01"
                   value={formData.basic}
-                  onChange={(e) => setFormData({ ...formData, basic: e.target.valueAsNumber || 0 })}
+                  onChange={(e) => setFormData({ ...formData, basic: e.target.value })}
                   className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all outline-none text-sm"
                 />
               </div>
@@ -134,8 +143,10 @@ export default function EditPayrollDialog({ open, onOpenChange, payroll, onUpdat
                 <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Bonus/Incentive (₹)</label>
                 <input
                   type="number"
+                  inputMode="decimal"
+                  step="0.01"
                   value={formData.bonus}
-                  onChange={(e) => setFormData({ ...formData, bonus: e.target.valueAsNumber || 0 })}
+                  onChange={(e) => setFormData({ ...formData, bonus: e.target.value })}
                   className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all outline-none text-sm"
                 />
               </div>
@@ -146,8 +157,10 @@ export default function EditPayrollDialog({ open, onOpenChange, payroll, onUpdat
                 <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Deductions (₹)</label>
                 <input
                   type="number"
+                  inputMode="decimal"
+                  step="0.01"
                   value={formData.deductions}
-                  onChange={(e) => setFormData({ ...formData, deductions: e.target.valueAsNumber || 0 })}
+                  onChange={(e) => setFormData({ ...formData, deductions: e.target.value })}
                   className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all outline-none text-sm text-rose-600"
                 />
               </div>

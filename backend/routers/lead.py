@@ -287,6 +287,13 @@ async def update_lead(
     if not lead:
         raise HTTPException(status_code=404, detail="Lead not found")
         
+    # Once a lead is converted (completed), only admin/super_admin may edit it.
+    if lead.status == "converted" and current_user.role not in ("admin", "super_admin"):
+        raise HTTPException(
+            status_code=403,
+            detail="This lead is converted and can only be edited by an admin.",
+        )
+
     old_status = lead.status
     old_assigned_to = lead.assigned_to
     

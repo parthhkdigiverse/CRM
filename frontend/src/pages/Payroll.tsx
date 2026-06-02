@@ -47,6 +47,11 @@ interface PayrollEntry {
 export default function Payroll() {
   const { user } = useAuthStore();
   const isEmployee = user?.role === 'employee';
+  const isHr = user?.role === 'hr';
+
+  // HR must not edit their OWN salary/payroll (backend enforces this too).
+  const isOwnPayroll = (entry: PayrollEntry) =>
+    isHr && !!user?.email && entry.employee?.email?.toLowerCase() === user.email.toLowerCase();
 
   const [payrolls, setPayrolls] = useState<PayrollEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -326,7 +331,7 @@ export default function Payroll() {
                       </td>
                       <td className="py-3 px-3 text-center">
                         <div className="flex items-center justify-center gap-2">
-                          {!isEmployee && (
+                          {!isEmployee && !isOwnPayroll(entry) && (
                             <>
                               {entry.status !== 'Paid' && (
                                 <button
@@ -359,7 +364,7 @@ export default function Payroll() {
                               <div className="h-4 w-[1px] bg-gray-200 dark:bg-gray-800 mx-1" />
                             </>
                           )}
-                          {!isEmployee && (
+                          {!isEmployee && !isOwnPayroll(entry) && (
                             <Button
                               variant="ghost"
                               size="sm"
@@ -371,6 +376,9 @@ export default function Payroll() {
                             >
                               <Edit2 className="h-4 w-4" />
                             </Button>
+                          )}
+                          {isOwnPayroll(entry) && (
+                            <span className="text-[11px] text-gray-400 italic mr-1">View only</span>
                           )}
                           <Button
                             variant="ghost"

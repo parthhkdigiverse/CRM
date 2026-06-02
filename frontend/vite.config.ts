@@ -17,7 +17,8 @@ export default defineConfig(({ mode }) => {
       proxy: {
         '/api': {
           target: `http://127.0.0.1:${backendPort}`,
-          changeOrigin: true
+          changeOrigin: true,
+          ws: true
         },
         '/storage': {
           target: `http://127.0.0.1:${backendPort}`,

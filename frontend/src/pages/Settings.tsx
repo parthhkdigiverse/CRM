@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { 
-  User, Building2, Bell, Shield, CreditCard, Puzzle, Camera, Loader2, History, Users, MoreVertical
+  User, Building2, Bell, Shield, CreditCard, Puzzle, Camera, Loader2, History, Users, MoreVertical, ShieldCheck
 } from 'lucide-react';
 import { 
   DropdownMenu,
@@ -17,6 +17,8 @@ import { toast } from 'sonner';
 import { apiClient } from '@/lib/axios';
 import { useAuthStore } from '@/store/authStore';
 import MetaIntegrationSettings from '@/components/MetaIntegrationSettings';
+import FeatureAccessSettings from '@/components/FeatureAccessSettings';
+import NotificationSettings from '@/components/NotificationSettings';
 
 const tabs = [
   { id: 'profile', label: 'Profile', icon: User },
@@ -26,6 +28,7 @@ const tabs = [
   { id: 'security', label: 'Security', icon: Shield },
   { id: 'billing', label: 'Billing', icon: CreditCard },
   { id: 'integrations', label: 'Integrations', icon: Puzzle },
+  { id: 'feature-access', label: 'Feature Access', icon: ShieldCheck },
   { id: 'team', label: 'Team Members', icon: Users },
 ];
 
@@ -770,7 +773,19 @@ export default function Settings() {
             </div>
           )}
 
-          {activeTab !== 'profile' && activeTab !== 'organization' && activeTab !== 'audit' && activeTab !== 'integrations' && (
+          {activeTab === 'feature-access' && (
+            <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+              <FeatureAccessSettings />
+            </div>
+          )}
+
+          {activeTab === 'notifications' && (
+            <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+              <NotificationSettings />
+            </div>
+          )}
+
+          {activeTab !== 'profile' && activeTab !== 'organization' && activeTab !== 'audit' && activeTab !== 'integrations' && activeTab !== 'feature-access' && activeTab !== 'notifications' && (
             <Card className="border-0 shadow-sm rounded-2xl bg-white dark:bg-gray-950">
               <CardContent className="p-12 text-center">
                 <div className="h-14 w-14 bg-gray-100 dark:bg-gray-900 rounded-2xl flex items-center justify-center mx-auto mb-4">

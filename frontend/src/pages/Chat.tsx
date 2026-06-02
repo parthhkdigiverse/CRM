@@ -166,8 +166,15 @@ export default function Chat() {
   useEffect(() => {
     if (!accessToken) return;
     const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const backendPort = import.meta.env.VITE_BACKEND_PORT || '8000';
-    const host = import.meta.env.VITE_API_URL ? new URL(import.meta.env.VITE_API_URL).host : `localhost:${backendPort}`;
+    // Determine the WS host:
+    // 1) If VITE_API_URL is an absolute URL (prod split deploy), use its host.
+    // 2) Otherwise connect to the SAME host serving the page (localhost, LAN, or
+    //    an ngrok tunnel) so the Vite dev proxy forwards the upgrade to the backend.
+    let host = window.location.host;
+    const apiUrl = import.meta.env.VITE_API_URL;
+    if (apiUrl && /^https?:\/\//i.test(apiUrl)) {
+      try { host = new URL(apiUrl).host; } catch { /* keep same-origin host */ }
+    }
     const socket = new WebSocket(`${proto}//${host}/api/v1/chat/ws?token=${accessToken}`);
     socket.onmessage = (e) => {
       const p = JSON.parse(e.data);
@@ -248,7 +255,10 @@ export default function Chat() {
         .catch(e => alert(apiErrorMessage(e, 'Unable to edit message')));
       return;
     }
-    if (!ws.current || ws.current.readyState !== WebSocket.OPEN) return;
+    if (!ws.current || ws.current.readyState !== WebSocket.OPEN) {
+      alert('Connection lost. Reconnecting — please try again in a moment.');
+      return;
+    }
     ws.current.send(JSON.stringify({ action: 'send_message', room_id: activeRoomId, content: text }));
     setNewMsg(''); setShowEmoji(false);
   };
@@ -475,13 +485,17 @@ export default function Chat() {
                   <Loader2 className="h-8 w-8 animate-spin text-violet-500 dark:text-violet-400" />
                   <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Loading conversations...</p>
                 </div>
-              ) : filteredRooms.length === 0 ? (
+              ) : filteredRooms.length === 0 && !(search.trim() && filteredUsers.length > 0) ? (
                 <div className="text-center py-20 px-8 flex flex-col items-center">
                   <div className="h-16 w-16 rounded-full bg-white dark:bg-slate-800/60 flex items-center justify-center mb-4 shadow-sm border border-gray-200 dark:border-slate-700">
                     <MessageSquare className="h-6 w-6 text-violet-400" />
                   </div>
-                  <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-1">No messages yet</h3>
-                  <p className="text-[14px] text-gray-500 dark:text-gray-400 leading-relaxed">Start a new conversation to connect with your team.</p>
+                  <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-1">
+                    {search.trim() ? 'No results found' : 'No messages yet'}
+                  </h3>
+                  <p className="text-[14px] text-gray-500 dark:text-gray-400 leading-relaxed">
+                    {search.trim() ? 'Try a different name.' : 'Start a new conversation to connect with your team.'}
+                  </p>
                 </div>
               ) : (
                 <div className="space-y-2 mt-2">
@@ -538,6 +552,27 @@ export default function Chat() {
                       </button>
                     );
                   })}
+
+                  {/* When searching, also show matching people to start a new chat with */}
+                  {search.trim() && filteredUsers.length > 0 && (
+                    <div className="pt-2">
+                      <p className="px-2 pb-1 text-[11px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">People</p>
+                      {filteredUsers.map(u => (
+                        <button key={`user-${u.id}`} onClick={() => { startDirect(u.user_id); setSearch(''); }}
+                          className="w-full flex items-center gap-[14px] p-[12px] rounded-2xl transition-all border border-transparent hover:bg-white dark:hover:bg-slate-800/60 hover:shadow-sm group">
+                          <Avatar className="h-[52px] w-[52px] shadow-sm shrink-0">
+                            {u.avatar?.trim() && <AvatarImage src={u.avatar} alt="Profile" className="object-cover" />}
+                            <AvatarFallback className="text-gray-800 text-sm font-semibold" style={{ background: pickBg(u.id) }}>{ini(u.name)}</AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0 text-left">
+                            <h4 className="text-[16px] font-semibold truncate text-gray-800 dark:text-gray-200 group-hover:text-violet-700 dark:group-hover:text-violet-300">{u.name}</h4>
+                            <p className="text-[13px] text-gray-500 dark:text-gray-400 capitalize truncate">{u.role}</p>
+                          </div>
+                          <MessageSquare className="h-4 w-4 text-gray-400 group-hover:text-violet-500 shrink-0" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -585,9 +620,6 @@ export default function Chat() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button className="h-[42px] w-[42px] rounded-full flex items-center justify-center text-gray-500 dark:text-gray-400 hover:text-violet-600 dark:hover:text-violet-400 hover:bg-gray-100 dark:hover:bg-slate-700 transition-all shadow-sm bg-white dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700">
-                    <Search className="h-[18px] w-[18px]" />
-                  </button>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <button className="h-[42px] w-[42px] rounded-full flex items-center justify-center text-gray-500 dark:text-gray-400 hover:text-violet-600 dark:hover:text-violet-400 hover:bg-gray-100 dark:hover:bg-slate-700 transition-all shadow-sm bg-white dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700">

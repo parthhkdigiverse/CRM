@@ -24,6 +24,9 @@ class Organization(Document):
     timezone: str = "Asia/Kolkata"
     invite_token: Optional[str] = None
     invite_token_expires: Optional[datetime] = None
+    # Per-role feature visibility matrix: {role: {module_key: bool}}.
+    # Empty / missing entries default to visible (allow-by-default).
+    feature_access: Dict = Field(default_factory=dict)
     settings: Dict = Field(default_factory=lambda: {
         "pipeline_stages": [
             "prospecting", "qualification", "proposal",

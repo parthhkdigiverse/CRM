@@ -28,7 +28,8 @@ async def get_employee_for_user(user: User, org: Optional[Organization]) -> Empl
     return emp
 
 
-@router.post("/", response_model=SuccessResponse)
+@router.post("", response_model=SuccessResponse)
+@router.post("/", response_model=SuccessResponse, include_in_schema=False)
 async def create_leave(
     data: LeaveCreate,
     current_user: User = Depends(get_current_user),
@@ -65,7 +66,8 @@ async def create_leave(
     return SuccessResponse(data={"id": str(leave.id)}, message="Leave request submitted successfully")
 
 
-@router.get("/", response_model=SuccessResponse)
+@router.get("", response_model=SuccessResponse)
+@router.get("/", response_model=SuccessResponse, include_in_schema=False)
 async def get_leaves(
     current_user: User = Depends(get_current_user),
     org: Optional[Organization] = Depends(get_current_org)

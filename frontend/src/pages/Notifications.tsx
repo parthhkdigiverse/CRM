@@ -434,7 +434,7 @@ export default function Notifications() {
                   <div
                     key={n.id}
                     onClick={() => handleNavigateEntity(n)}
-                    className={`p-4 border rounded-2xl cursor-pointer hover:shadow-sm transition-all duration-200 flex gap-4 bg-white dark:bg-gray-900/50 relative overflow-hidden group ${
+                    className={`p-4 border rounded-2xl cursor-pointer hover:shadow-sm transition-all duration-200 flex gap-4 bg-white dark:bg-gray-900/50 relative group shrink-0 items-start ${
                       !n.is_read 
                         ? 'border-blue-100 bg-blue-50/10 dark:border-blue-900/30 dark:bg-blue-950/5' 
                         : 'border-gray-150 dark:border-gray-800/80'

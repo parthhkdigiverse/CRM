@@ -193,6 +193,15 @@ async def update_payroll(
     if not payroll:
         raise HTTPException(status_code=404, detail="Payroll not found")
     payroll_object_id = require_object_id(payroll.id, "payroll.id")
+
+    # HR cannot edit their OWN salary/payroll — only an admin can. Admins are exempt.
+    if current_user.role == "hr":
+        own_emp = await Employee.find_one(Employee.user_id == current_user.id)
+        if own_emp and str(own_emp.id) == str(payroll.employee_id):
+            raise HTTPException(
+                status_code=403,
+                detail="You cannot edit your own salary or payroll. Only an admin can do this for you.",
+            )
         
     update_data = data.model_dump(exclude_unset=True)
     for k, v in update_data.items():

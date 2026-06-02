@@ -12,6 +12,13 @@ from models.user import User
 from models.organization import Organization
 from schemas.organization import OrgCreate, OrgUpdate, OrgResponse, InviteMemberRequest, JoinOrgRequest
 from schemas.common import SuccessResponse
+from schemas.feature_access import (
+    FEATURE_MODULES,
+    CONFIGURABLE_ROLES,
+    MODULE_KEYS,
+    resolve_feature_access,
+    FeatureAccessUpdate,
+)
 from utils.helpers import utc_now, generate_invite_token
 from services.audit_service import log_action
 from config import settings
@@ -169,4 +176,70 @@ async def change_member_role(
                      {"role": {"old": old_role, "new": role}})
 
     return SuccessResponse(message=f"Role changed to {role}")
+
+
+# ── Feature Access (per-role module visibility) ─────────────────────────────
+
+@router.get("/feature-access", response_model=SuccessResponse)
+async def get_feature_access(
+    current_user: User = Depends(get_current_user),
+    org: Optional[Organization] = Depends(get_current_org),
+):
+    """
+    Return the module catalog + the org's resolved feature-access matrix.
+    Available to any authenticated org member so the UI can gate features.
+    """
+    if org is None:
+        # super_admin (no org) — return defaults, everything visible
+        return SuccessResponse(data={
+            "modules": FEATURE_MODULES,
+            "configurable_roles": CONFIGURABLE_ROLES,
+            "feature_access": resolve_feature_access({}),
+        })
+
+    resolved = resolve_feature_access(getattr(org, "feature_access", {}) or {})
+    return SuccessResponse(data={
+        "modules": FEATURE_MODULES,
+        "configurable_roles": CONFIGURABLE_ROLES,
+        "feature_access": resolved,
+    })
+
+
+@router.put(
+    "/feature-access",
+    response_model=SuccessResponse,
+    dependencies=[Depends(require_roles("admin", "super_admin"))],
+)
+async def update_feature_access(
+    data: FeatureAccessUpdate,
+    current_user: User = Depends(get_current_user),
+    org: Optional[Organization] = Depends(get_current_org),
+):
+    """Admin updates which modules are visible to hr/employee roles."""
+    if org is None:
+        raise HTTPException(status_code=400, detail="No organization context")
+
+    # Start from the current resolved matrix, then apply validated overrides.
+    resolved = resolve_feature_access(getattr(org, "feature_access", {}) or {})
+    for role, modules in (data.feature_access or {}).items():
+        if role not in CONFIGURABLE_ROLES:
+            continue  # ignore admin/super_admin or unknown roles
+        for key, value in (modules or {}).items():
+            if key in MODULE_KEYS:
+                resolved[role][key] = bool(value)
+
+    org.feature_access = resolved
+    org.updated_by = current_user.id
+    org.updated_at = utc_now()
+    await org.save()
+
+    await log_action(str(org.id), str(current_user.id), "update", "organization", str(org.id),
+                     changes={"feature_access": "updated"})
+
+    return SuccessResponse(data={
+        "modules": FEATURE_MODULES,
+        "configurable_roles": CONFIGURABLE_ROLES,
+        "feature_access": resolved,
+    }, message="Feature access updated")
+
 

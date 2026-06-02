@@ -1,12 +1,19 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
+import { useFeatureStore } from '@/store/featureStore';
 
 export default function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
   const isChatPage = location.pathname === '/chat';
+  const fetchFeatureAccess = useFeatureStore((s) => s.fetchFeatureAccess);
+
+  // Load the org's feature-access matrix once for the authenticated session.
+  useEffect(() => {
+    fetchFeatureAccess();
+  }, [fetchFeatureAccess]);
 
   return (
     <div className="flex h-screen bg-gray-50/50 dark:bg-gray-900 overflow-hidden">

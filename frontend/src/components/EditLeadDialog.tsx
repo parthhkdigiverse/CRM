@@ -6,6 +6,7 @@ import { apiClient } from '@/lib/axios';
 import { toast } from 'sonner';
 import FormDrawer, { FormField, ChipSelect, inputClass, textareaClass } from '@/components/FormDrawer';
 import MoreDetails from '@/components/MoreDetails';
+import { FacebookIcon, InstagramIcon } from '@/components/BrandIcons';
 
 interface EditLeadDialogProps {
   open: boolean;
@@ -147,6 +148,38 @@ export default function EditLeadDialog({ open, onOpenChange, lead, onLeadUpdated
         </FormField>
       </MoreDetails>
 
+      {/* Meta (Facebook / Instagram) Lead Ads details — read-only, shown only for Meta leads */}
+      {lead?.meta_lead_id && (
+        <div className="border border-gray-100 dark:border-gray-800 rounded-xl p-3 mt-2 bg-gray-50/50 dark:bg-gray-900/30">
+          <div className="flex items-center gap-2 mb-3">
+            {lead.meta_platform === 'instagram' ? (
+              <span className="h-6 w-6 rounded-md flex items-center justify-center text-white"
+                style={{ background: 'linear-gradient(135deg, #f58529, #dd2a7b 55%, #8134af)' }}>
+                <InstagramIcon className="h-3.5 w-3.5" />
+              </span>
+            ) : (
+              <span className="h-6 w-6 rounded-md flex items-center justify-center text-white bg-blue-600">
+                <FacebookIcon className="h-3.5 w-3.5" />
+              </span>
+            )}
+            <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100">
+              Meta Ad Details
+            </h4>
+            <span className="text-[10px] font-medium uppercase tracking-wider text-gray-400 ml-auto">
+              {lead.meta_platform || 'meta'}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-xs">
+            <MetaDetailRow label="Platform" value={lead.meta_platform} capitalize />
+            <MetaDetailRow label="City / Area" value={lead.meta_city} />
+            <MetaDetailRow label="Campaign Name" value={lead.meta_campaign_name} />
+            <MetaDetailRow label="Ad Set Name" value={lead.meta_adset_name} />
+            <MetaDetailRow label="Ad Name" value={lead.meta_ad_name} />
+            <MetaDetailRow label="Form Name" value={lead.meta_form_name} />
+          </div>
+        </div>
+      )}
+
       {/* Delete button */}
       <div className="border-t border-gray-100 dark:border-gray-800 pt-3 mt-2">
         <Button type="button" variant="ghost" size="sm" className="text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20" onClick={handleDelete}>
@@ -154,5 +187,16 @@ export default function EditLeadDialog({ open, onOpenChange, lead, onLeadUpdated
         </Button>
       </div>
     </FormDrawer>
+  );
+}
+
+function MetaDetailRow({ label, value, capitalize }: { label: string; value?: string | null; capitalize?: boolean }) {
+  return (
+    <div>
+      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">{label}</p>
+      <p className={`text-gray-800 dark:text-gray-200 font-medium mt-0.5 break-words ${capitalize ? 'capitalize' : ''}`}>
+        {value || '—'}
+      </p>
+    </div>
   );
 }

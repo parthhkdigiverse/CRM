@@ -32,6 +32,7 @@ from models.inventory import InventoryProduct
 from models.sale import Sale
 from models.expense import Expense
 from models.overtime import Overtime
+from models.meta_integration import MetaIntegration
 
 _client: AsyncIOMotorClient = None
 
@@ -63,6 +64,7 @@ ALL_MODELS = [
     Sale,
     Expense,
     Overtime,
+    MetaIntegration,
 ]
 
 

@@ -18,3 +18,6 @@ cloudinary
 resend
 reportlab
 anthropic
+
+# Meta (Facebook / Instagram) Lead Ads integration uses `httpx` (already listed above)
+# for Graph API calls. Auto-sync uses Python's built-in asyncio (no node-cron needed).

@@ -53,6 +53,18 @@ class LeadResponse(BaseModel):
     notes: Optional[str] = None
     address: Optional[str] = None
     converted_deal_id: Optional[str] = None
+    # Meta Lead Ads fields
+    meta_lead_id: Optional[str] = None
+    meta_platform: Optional[str] = None
+    meta_ad_id: Optional[str] = None
+    meta_ad_name: Optional[str] = None
+    meta_campaign_id: Optional[str] = None
+    meta_campaign_name: Optional[str] = None
+    meta_adset_id: Optional[str] = None
+    meta_adset_name: Optional[str] = None
+    meta_form_id: Optional[str] = None
+    meta_form_name: Optional[str] = None
+    meta_city: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 

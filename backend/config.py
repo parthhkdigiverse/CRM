@@ -59,12 +59,27 @@ class Settings(BaseSettings):
     CLOUDINARY_API_KEY: str = ""
     CLOUDINARY_API_SECRET: str = ""
 
+    # Meta (Facebook / Instagram) Lead Ads integration.
+    # NOTE: Credentials are now stored PER-ORGANIZATION in the database
+    # (Settings → Integrations), encrypted at rest. These globals are no longer
+    # used for credentials. Only the Graph API default version remains as a fallback.
+    META_GRAPH_VERSION: str = "v19.0"
+
     # App
     APP_ENV: str = "development"
     FRONTEND_URL: str = f"http://localhost:{FRONTEND_PORT}"
     BACKEND_URL: str = f"http://localhost:{BACKEND_PORT}"
     ALLOWED_ORIGINS: str = f"http://localhost:{FRONTEND_PORT},http://127.0.0.1:{FRONTEND_PORT},http://localhost:3000,http://127.0.0.1:3000"
     TRUSTED_PROXY_IPS: str = ""
+
+    # Secret used to encrypt sensitive integration credentials at rest (e.g. Meta tokens).
+    ENCRYPTION_KEY: str = "0123456789abcdef0123456789abcdef"
+
+    # Cross-domain cookie behaviour. When the frontend (Vercel) and backend (Render)
+    # are on different domains, refresh-token cookies must use SameSite=None + Secure.
+    # Set COOKIE_SAMESITE=none and COOKIE_SECURE=true in production.
+    COOKIE_SAMESITE: str = "lax"   # "lax" | "none" | "strict"
+    COOKIE_SECURE: bool = False    # force Secure flag (auto-true when SameSite=none)
 
     # Abuse protection and payload limits
     GLOBAL_RATE_LIMIT_REQUESTS: int = 300

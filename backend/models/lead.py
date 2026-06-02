@@ -29,6 +29,20 @@ class Lead(Document):
     score_history: List[Dict] = Field(default_factory=list)  # [{score, reason, timestamp}]
     converted_deal_id: Optional[PydanticObjectId] = None
 
+    # --- Meta (Facebook / Instagram) Lead Ads fields (additive, all optional) ---
+    meta_lead_id: Optional[str] = None        # unique leadgen id from Facebook (dedup key)
+    meta_platform: Optional[str] = None       # "facebook" or "instagram"
+    meta_ad_id: Optional[str] = None
+    meta_ad_name: Optional[str] = None
+    meta_campaign_id: Optional[str] = None
+    meta_campaign_name: Optional[str] = None
+    meta_adset_id: Optional[str] = None
+    meta_adset_name: Optional[str] = None
+    meta_form_id: Optional[str] = None
+    meta_form_name: Optional[str] = None
+    meta_city: Optional[str] = None           # from field_data or geo breakdown
+    meta_raw_fields: Optional[List[Dict]] = None  # full field_data payload as JSON
+
     # Base fields
     org_id: PydanticObjectId
     created_by: PydanticObjectId
@@ -45,4 +59,5 @@ class Lead(Document):
             "org_id",
             "status",
             "assigned_to",
+            "meta_lead_id",
         ]

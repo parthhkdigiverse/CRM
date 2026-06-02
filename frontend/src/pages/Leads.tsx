@@ -4,12 +4,16 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { 
-  Target, Users, TrendingUp, CheckCircle, Search, UserPlus, RefreshCw
+  Target, Users, TrendingUp, CheckCircle, Search, UserPlus, RefreshCw, AlertTriangle, Mail, Phone
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { apiClient } from '@/lib/axios';
+import { toast } from 'sonner';
 import NewLeadDialog from '@/components/NewLeadDialog';
 import EditLeadDialog from '@/components/EditLeadDialog';
+import MetaAdsSummary from '@/components/MetaAdsSummary';
+import { getSourceBadge } from '@/lib/leadSources';
+import { syncMetaLeads, getMetaStatus, formatRelativeTime } from '@/lib/api/meta';
 
 interface Lead {
   id: string;
@@ -24,6 +28,10 @@ interface Lead {
   assigned_to?: string;
   notes?: string;
   created_at: string;
+  // Meta fields
+  meta_lead_id?: string;
+  meta_platform?: string;
+  meta_city?: string;
 }
 
 const unwrapList = <T,>(payload: any): T[] => {
@@ -31,15 +39,6 @@ const unwrapList = <T,>(payload: any): T[] => {
   if (Array.isArray(data)) return data;
   if (Array.isArray(data?.data)) return data.data;
   return [];
-};
-
-const sourceColors: Record<string, string> = {
-  web: 'bg-blue-50 text-blue-600 border-blue-100 dark:bg-blue-900/20 dark:text-blue-400',
-  referral: 'bg-purple-50 text-purple-600 border-purple-100 dark:bg-purple-900/20 dark:text-purple-400',
-  social: 'bg-pink-50 text-pink-600 border-pink-100 dark:bg-pink-900/20 dark:text-pink-400',
-  email: 'bg-orange-50 text-orange-600 border-orange-100 dark:bg-orange-900/20 dark:text-orange-400',
-  cold: 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400',
-  event: 'bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400',
 };
 
 const statusColors: Record<string, string> = {
@@ -57,6 +56,13 @@ export default function Leads() {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
 
+  // Meta integration state
+  const [syncing, setSyncing] = useState(false);
+  const [lastSynced, setLastSynced] = useState<string | null>(null);
+  const [metaError, setMetaError] = useState(false);
+  const [metaConfigured, setMetaConfigured] = useState(false);
+  const [summaryRefresh, setSummaryRefresh] = useState(0);
+
   const fetchLeads = useCallback(async () => {
     setLoading(true);
     try {
@@ -65,7 +71,6 @@ export default function Leads() {
       const leadsRes = await apiClient.get('/leads', { params });
       setLeads(unwrapList<Lead>(leadsRes.data));
     } catch (err: any) {
-      // If not authenticated or no org, show empty state
       console.warn('Could not fetch leads:', err?.response?.status);
       setLeads([]);
     } finally {
@@ -73,15 +78,55 @@ export default function Leads() {
     }
   }, [search]);
 
+  // Load Meta connection status (for last-synced label & warning badge)
+  const fetchMetaStatus = useCallback(async () => {
+    try {
+      const status = await getMetaStatus();
+      if (status) {
+        setMetaConfigured(status.configured);
+        setLastSynced(status.last_synced_at);
+        setMetaError(!!status.last_error);
+      }
+    } catch {
+      // Don't crash the page if status check fails
+      setMetaError(true);
+    }
+  }, []);
+
   useEffect(() => {
     fetchLeads();
   }, [fetchLeads]);
 
-  const getEffectiveStatus = (lead: Lead) => {
-    return lead.status;
-  };
+  useEffect(() => {
+    fetchMetaStatus();
+  }, [fetchMetaStatus]);
 
-  // Compute stats from live data
+  // The Refresh button: reloads leads AND triggers a manual Meta sync.
+  const handleRefresh = useCallback(async () => {
+    await fetchLeads();
+    if (metaConfigured) {
+      setSyncing(true);
+      try {
+        const result = await syncMetaLeads();
+        setMetaError(result.errors.length > 0);
+        setLastSynced(result.synced_at);
+        if (result.created > 0) {
+          toast.success(`${result.created} new lead(s) fetched from Meta Ads`);
+          await fetchLeads();
+        }
+        setSummaryRefresh((n) => n + 1);
+      } catch (err: any) {
+        setMetaError(true);
+        // Non-fatal: show a gentle warning, don't crash
+        toast.warning('Meta sync failed — showing existing leads');
+      } finally {
+        setSyncing(false);
+      }
+    }
+  }, [fetchLeads, metaConfigured]);
+
+  const getEffectiveStatus = (lead: Lead) => lead.status;
+
   const stats = {
     new: leads.filter(l => getEffectiveStatus(l) === 'new').length,
     qualified: leads.filter(l => getEffectiveStatus(l) === 'qualified').length,
@@ -97,8 +142,6 @@ export default function Leads() {
     }
   };
 
-
-
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-8">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -107,16 +150,30 @@ export default function Leads() {
           <p className="text-gray-500 dark:text-gray-400 mt-1">Track and convert your sales leads.</p>
         </div>
         <div className="flex items-center gap-3">
-          <Button variant="outline" className="bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800 rounded-xl h-9 px-4" onClick={fetchLeads}>
-            <RefreshCw className={cn("h-4 w-4 mr-2 text-gray-500", loading && "animate-spin")} /> Refresh
-          </Button>
+          <div className="flex flex-col items-end">
+            <Button
+              variant="outline"
+              className="bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800 rounded-xl h-9 px-4"
+              onClick={handleRefresh}
+              disabled={loading || syncing}
+            >
+              <RefreshCw className={cn("h-4 w-4 mr-2 text-gray-500", (loading || syncing) && "animate-spin")} />
+              {syncing ? 'Syncing...' : 'Refresh'}
+            </Button>
+            {metaConfigured && (
+              <span className="text-[10px] text-gray-400 mt-1 flex items-center gap-1">
+                {metaError && <AlertTriangle className="h-2.5 w-2.5 text-amber-500" />}
+                Last synced: {formatRelativeTime(lastSynced)}
+              </span>
+            )}
+          </div>
           <Button className="bg-purple-600 hover:bg-purple-700 text-white rounded-xl h-9 px-4" onClick={() => setDialogOpen(true)}>
             <UserPlus className="h-4 w-4 mr-2" /> New Lead
           </Button>
         </div>
       </div>
 
-      {/* Metric Cards — Live Data */}
+      {/* Metric Cards — Live Data (includes Meta ad leads automatically) */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {[
           { label: 'New Lead', value: stats.new.toString(), icon: Target, bg: 'bg-blue-100 dark:bg-blue-900/30', fg: 'text-blue-600 dark:text-blue-400' },
@@ -137,6 +194,9 @@ export default function Leads() {
           </Card>
         ))}
       </div>
+
+      {/* Meta Ads Summary (collapsible) — renders only when Meta is in use */}
+      <MetaAdsSummary refreshSignal={summaryRefresh} />
 
       {/* Table */}
       <div className="bg-white dark:bg-gray-950 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden">
@@ -184,38 +244,53 @@ export default function Leads() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                {leads.map((l) => (
-                  <tr 
-                    key={l.id} 
-                    className="hover:bg-gray-50/50 dark:hover:bg-gray-900/50 transition-colors cursor-pointer"
-                    onClick={() => {
-                      setSelectedLead(l);
-                      setEditDialogOpen(true);
-                    }}
-                  >
-                    <td className="px-6 py-4">
-                      <div>
-                        <span className="font-medium text-gray-900 dark:text-gray-100">{l.name}</span>
-                        <p className="text-xs text-gray-400 mt-0.5">{l.job_title || 'No Title'} • {l.email || 'No Email'}</p>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={cn("px-2.5 py-1 rounded-full text-xs font-medium border capitalize", sourceColors[l.source] || sourceColors.web)}>{l.source}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div>
-                        <span className="text-gray-700 dark:text-gray-300 font-medium">{l.company || '—'}</span>
-                        <p className="text-xs font-semibold text-purple-600 dark:text-purple-400 mt-0.5">{formatINRCompact(l.value)}</p>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <span className={cn("px-2.5 py-1 rounded-full text-xs font-bold capitalize", statusColors[getEffectiveStatus(l)] || statusColors.new)}>
-                        {getEffectiveStatus(l).replace('_', ' ')}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-gray-500">{formatDate(l.created_at)}</td>
-                  </tr>
-                ))}
+                {leads.map((l) => {
+                  const badge = getSourceBadge(l.source);
+                  return (
+                    <tr 
+                      key={l.id} 
+                      className="hover:bg-gray-50/50 dark:hover:bg-gray-900/50 transition-colors cursor-pointer"
+                      onClick={() => {
+                        setSelectedLead(l);
+                        setEditDialogOpen(true);
+                      }}
+                    >
+                      <td className="px-6 py-4">
+                        <div>
+                          <span className="font-medium text-gray-900 dark:text-gray-100">{l.name}</span>
+                          {/* Show email + phone below the name */}
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5">
+                            <span className="text-xs text-gray-400 flex items-center gap-1">
+                              <Mail className="h-3 w-3" /> {l.email || 'No email'}
+                            </span>
+                            {l.phone && (
+                              <span className="text-xs text-gray-400 flex items-center gap-1">
+                                <Phone className="h-3 w-3" /> {l.phone}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={badge.className} style={badge.style}>
+                          {badge.label}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div>
+                          <span className="text-gray-700 dark:text-gray-300 font-medium">{l.company || '—'}</span>
+                          <p className="text-xs font-semibold text-purple-600 dark:text-purple-400 mt-0.5">{formatINRCompact(l.value)}</p>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <span className={cn("px-2.5 py-1 rounded-full text-xs font-bold capitalize", statusColors[getEffectiveStatus(l)] || statusColors.new)}>
+                          {getEffectiveStatus(l).replace('_', ' ')}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-gray-500">{formatDate(l.created_at)}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           )}

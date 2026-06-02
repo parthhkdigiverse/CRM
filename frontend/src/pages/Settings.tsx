@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/axios';
 import { useAuthStore } from '@/store/authStore';
+import MetaIntegrationSettings from '@/components/MetaIntegrationSettings';
 
 const tabs = [
   { id: 'profile', label: 'Profile', icon: User },
@@ -763,7 +764,13 @@ export default function Settings() {
             <AuditLogsView />
           )}
 
-          {activeTab !== 'profile' && activeTab !== 'organization' && activeTab !== 'audit' && (
+          {activeTab === 'integrations' && (
+            <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+              <MetaIntegrationSettings />
+            </div>
+          )}
+
+          {activeTab !== 'profile' && activeTab !== 'organization' && activeTab !== 'audit' && activeTab !== 'integrations' && (
             <Card className="border-0 shadow-sm rounded-2xl bg-white dark:bg-gray-950">
               <CardContent className="p-12 text-center">
                 <div className="h-14 w-14 bg-gray-100 dark:bg-gray-900 rounded-2xl flex items-center justify-center mx-auto mb-4">

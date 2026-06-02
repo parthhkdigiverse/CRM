@@ -17,7 +17,7 @@ from config import settings
 from database import init_db, close_db
 from middleware.security import RequestSecurityMiddleware, SecurityHeadersMiddleware
 from schemas.common import ErrorResponse, ErrorDetail
-from routers import auth, organization, contact, company, lead, deal, invoice, task, employee, ai, attendance, project, meeting, document, audit_log, target, super_admin, payroll, leave, chat, inventory, sale, finance, reports, expense, overtime, notification
+from routers import auth, organization, contact, company, lead, deal, invoice, task, employee, ai, attendance, project, meeting, document, audit_log, target, super_admin, payroll, leave, chat, inventory, sale, finance, reports, expense, overtime, notification, meta
 from utils.logging import configure_secure_logging, redact
 
 configure_secure_logging(logging.INFO if not settings.is_production else logging.WARNING)
@@ -48,9 +48,22 @@ async def lifespan(app: FastAPI):
             logging.info(f"Verified/synced {count} existing invoices to the Sales collection.")
     except Exception as e:
         logging.error(f"Failed to run startup invoice-sales migration: {e}")
-        
+
+    # Start the Meta Lead Ads background auto-sync scheduler
+    try:
+        from services import meta_scheduler
+        meta_scheduler.start_scheduler()
+    except Exception as e:
+        logging.error(f"Failed to start Meta auto-sync scheduler: {e}")
+
     yield
     # Shutdown
+    try:
+        from services import meta_scheduler
+        await meta_scheduler.stop_scheduler()
+    except Exception as e:
+        logging.error(f"Failed to stop Meta auto-sync scheduler: {e}")
+
     await close_db()
     logging.info("Database connection closed.")
 
@@ -157,6 +170,8 @@ app.include_router(finance.router)
 app.include_router(reports.router)
 app.include_router(overtime.router)
 app.include_router(notification.router)
+app.include_router(meta.router)
+app.include_router(meta.webhook_router)
 
 
 @app.get("/api/health", tags=["System"])

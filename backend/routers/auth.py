@@ -37,6 +37,33 @@ def _is_secure_request(request: Request) -> bool:
     return forwarded_proto.lower() == "https"
 
 
+def _cookie_kwargs(request: Request, max_age: int) -> dict:
+    """
+    Build cross-domain-safe cookie kwargs.
+
+    When the frontend (e.g. Vercel) and backend (e.g. Render) are on different
+    domains, the refresh-token cookie must use SameSite=None + Secure. This is
+    driven by COOKIE_SAMESITE / COOKIE_SECURE settings, with a safe fallback to
+    the previous "lax" behaviour for local development.
+    """
+    from config import settings
+
+    samesite = (settings.COOKIE_SAMESITE or "lax").lower()
+    if samesite not in ("lax", "none", "strict"):
+        samesite = "lax"
+
+    # SameSite=None REQUIRES Secure=True per the cookie spec.
+    secure = settings.COOKIE_SECURE or _is_secure_request(request) or samesite == "none"
+
+    return {
+        "httponly": True,
+        "secure": secure,
+        "samesite": samesite,
+        "max_age": max_age,
+        "path": "/",
+    }
+
+
 @router.post("/register", response_model=SuccessResponse, dependencies=[Depends(rate_limit(5, 60))])
 async def register(data: RegisterRequest):
     """Register a new user account."""
@@ -69,15 +96,8 @@ async def login(data: LoginRequest, request: Request, response: Response):
         )
 
         # Set HTTP-only cookie for refresh token
-        is_secure = _is_secure_request(request)
-        response.set_cookie(
-            key="refresh_token",
-            value=refresh_token,
-            httponly=True,
-            secure=is_secure,
-            samesite="lax",
-            max_age=30 * 24 * 60 * 60 if data.remember_me else 7 * 24 * 60 * 60,
-        )
+        max_age = 30 * 24 * 60 * 60 if data.remember_me else 7 * 24 * 60 * 60
+        response.set_cookie("refresh_token", refresh_token, **_cookie_kwargs(request, max_age))
 
         return SuccessResponse(
             data={
@@ -112,15 +132,7 @@ async def refresh(request: Request, response: Response):
         new_access, new_refresh = await auth_service.refresh_access_token(refresh_token, ip, user_agent)
 
         # Update cookie
-        is_secure = _is_secure_request(request)
-        response.set_cookie(
-            key="refresh_token",
-            value=new_refresh,
-            httponly=True,
-            secure=is_secure,
-            samesite="lax",
-            max_age=7 * 24 * 60 * 60,  # Default 7 days on refresh
-        )
+        response.set_cookie("refresh_token", new_refresh, **_cookie_kwargs(request, 7 * 24 * 60 * 60))
 
         return SuccessResponse(data={"access_token": new_access, "token_type": "bearer"})
     except ValueError as e:
@@ -156,15 +168,7 @@ async def google_callback(code: str, request: Request, response: Response):
         user, access_token, refresh_token = await oauth_service.handle_google_callback(code)
 
         # Set cookie
-        is_secure = _is_secure_request(request)
-        response.set_cookie(
-            key="refresh_token",
-            value=refresh_token,
-            httponly=True,
-            secure=is_secure,
-            samesite="lax",
-            max_age=7 * 24 * 60 * 60,
-        )
+        response.set_cookie("refresh_token", refresh_token, **_cookie_kwargs(request, 7 * 24 * 60 * 60))
 
         # Do not place bearer tokens in URLs. The frontend can call /refresh using the secure cookie.
         from config import settings

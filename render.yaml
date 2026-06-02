@@ -1,0 +1,65 @@
+# Render Blueprint for the AI-Setu CRM backend (FastAPI).
+# Deploy: push to GitHub, then in Render → New → Blueprint, pick this repo.
+# Fill the env vars marked `sync: false` in the Render dashboard (they are secrets).
+
+services:
+  - type: web
+    name: ai-setu-crm-api
+    runtime: python
+    plan: free                       # upgrade for always-on (free instances sleep)
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.4"
+      - key: APP_ENV
+        value: production
+
+      # --- Database ---
+      - key: MONGODB_URL
+        sync: false                  # set in dashboard (MongoDB Atlas connection string)
+      - key: MONGODB_DB_NAME
+        value: ai_setu_crm
+
+      # --- Security / JWT (generate strong random values) ---
+      - key: JWT_SECRET_KEY
+        generateValue: true          # Render generates a strong secret
+      - key: JWT_ALGORITHM
+        value: HS256
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "30"
+      - key: REFRESH_TOKEN_EXPIRE_DAYS
+        value: "7"
+      - key: ENCRYPTION_KEY
+        generateValue: true          # used to encrypt Meta credentials at rest
+
+      # --- Cross-domain cookies (frontend on Vercel, backend on Render) ---
+      - key: COOKIE_SAMESITE
+        value: none
+      - key: COOKIE_SECURE
+        value: "true"
+
+      # --- URLs / CORS (set these to your real domains after first deploy) ---
+      - key: FRONTEND_URL
+        sync: false                  # e.g. https://your-app.vercel.app
+      - key: BACKEND_URL
+        sync: false                  # e.g. https://ai-setu-crm-api.onrender.com
+      - key: ALLOWED_ORIGINS
+        sync: false                  # e.g. https://your-app.vercel.app
+
+      # --- Optional integrations ---
+      - key: RESEND_API_KEY
+        sync: false
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false

@@ -76,6 +76,89 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
 
   const [unreadCount, setUnreadCount] = useState(0);
 
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+
+  // Focus input on Ctrl+K or Cmd+K
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        const input = document.getElementById('global-search');
+        if (input) input.focus();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Debounced search api request
+  useEffect(() => {
+    if (!searchQuery.trim() || searchQuery.length < 2) {
+      setSearchResults([]);
+      setSearchOpen(false);
+      return;
+    }
+
+    const delayDebounce = setTimeout(async () => {
+      setSearchLoading(true);
+      setSearchOpen(true);
+      try {
+        const response = await apiClient.get(`/search?q=${encodeURIComponent(searchQuery)}`);
+        if (response.data?.success) {
+          setSearchResults(response.data.data || []);
+        }
+      } catch (err) {
+        console.error('Search failed:', err);
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(delayDebounce);
+  }, [searchQuery]);
+
+  // Close search dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const container = document.getElementById('search-container');
+      if (container && !container.contains(e.target as Node)) {
+        setSearchOpen(false);
+      }
+    };
+    window.addEventListener('click', handleClickOutside);
+    return () => window.removeEventListener('click', handleClickOutside);
+  }, []);
+
+  const typeIcons: Record<string, any> = {
+    lead: Target,
+    contact: Users,
+    company: Building2,
+    invoice: Receipt,
+    deal: TrendingUp,
+    project: Folder,
+  };
+  
+  const typeLabels: Record<string, string> = {
+    lead: 'Lead',
+    contact: 'Contact',
+    company: 'Company',
+    invoice: 'Invoice',
+    deal: 'Deal',
+    project: 'Project',
+  };
+
+  const typeBadgeColors: Record<string, string> = {
+    lead: 'bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-450 dark:border-emerald-900/50',
+    contact: 'bg-blue-50 text-blue-750 border-blue-100 dark:bg-blue-950/20 dark:text-blue-450 dark:border-blue-900/50',
+    company: 'bg-orange-50 text-orange-750 border-orange-100 dark:bg-orange-950/20 dark:text-orange-450 dark:border-orange-900/50',
+    invoice: 'bg-purple-50 text-purple-750 border-purple-100 dark:bg-purple-950/20 dark:text-purple-450 dark:border-purple-900/50',
+    deal: 'bg-indigo-50 text-indigo-750 border-indigo-100 dark:bg-indigo-950/20 dark:text-indigo-450 dark:border-indigo-900/50',
+    project: 'bg-pink-50 text-pink-750 border-pink-100 dark:bg-pink-950/20 dark:text-pink-450 dark:border-pink-900/50',
+  };
+
   useEffect(() => {
     const fetchUnreadCount = async () => {
       try {
@@ -114,7 +197,7 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
         </Button>
         
         {/* Search Bar matching screenshot */}
-        <div className="relative w-full max-w-md hidden md:flex items-center">
+        <div id="search-container" className="relative w-full max-w-md hidden md:flex items-center">
           <div className="absolute left-3 text-gray-400">
             <Search className="h-4 w-4" />
           </div>
@@ -123,14 +206,89 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
             name="global_search"
             type="text" 
             autoComplete="off"
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setSearchOpen(true);
+            }}
+            onFocus={() => {
+              if (searchQuery.trim().length >= 2) {
+                setSearchOpen(true);
+              }
+            }}
             placeholder="Search clients, leads, invoices..." 
-            className="pl-9 bg-gray-50/50 dark:bg-gray-900/50 border-gray-200 dark:border-gray-800 w-full rounded-xl h-9"
+            className="pl-9 bg-gray-50/50 dark:bg-gray-900/50 border-gray-200 dark:border-gray-800 w-full rounded-xl h-9 focus-visible:ring-purple-500"
           />
           <div className="absolute right-3 flex items-center">
-             <kbd className="hidden sm:inline-flex h-5 items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100">
-                <span className="text-xs">⌘</span>K
-              </kbd>
+             {searchQuery ? (
+               <button 
+                 onClick={() => {
+                   setSearchQuery('');
+                   setSearchResults([]);
+                   setSearchOpen(false);
+                 }}
+                 className="text-xs text-gray-400 hover:text-gray-650 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 px-1.5 py-0.5 rounded font-mono"
+               >
+                 ESC
+               </button>
+             ) : (
+               <kbd className="hidden sm:inline-flex h-5 items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100">
+                  <span className="text-xs">⌘</span>K
+                </kbd>
+             )}
           </div>
+
+          {/* Search Dropdown Overlay */}
+          {searchOpen && (
+            <div className="absolute top-full left-0 w-full mt-2 bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 shadow-2xl rounded-2xl overflow-hidden z-50 max-h-[380px] overflow-y-auto animate-in fade-in slide-in-from-top-2 duration-200">
+              {searchLoading ? (
+                <div className="p-8 text-center text-sm text-gray-500 dark:text-gray-400 flex items-center justify-center gap-2">
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-purple-600 border-t-transparent"></div>
+                  Searching...
+                </div>
+              ) : searchResults.length === 0 ? (
+                <div className="p-8 text-center text-sm text-gray-500 dark:text-gray-400">
+                  No results found for <span className="font-semibold">"{searchQuery}"</span>
+                </div>
+              ) : (
+                <div className="py-2 divide-y divide-gray-50 dark:divide-gray-900">
+                  {searchResults.map((item) => {
+                    const Icon = typeIcons[item.type] || Search;
+                    const label = typeLabels[item.type] || 'Result';
+                    const badgeClass = typeBadgeColors[item.type] || 'bg-gray-100 text-gray-700';
+
+                    return (
+                      <div
+                        key={item.id}
+                        onClick={() => {
+                          navigate(item.href);
+                          setSearchQuery('');
+                          setSearchResults([]);
+                          setSearchOpen(false);
+                        }}
+                        className="flex items-center justify-between px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-900 cursor-pointer transition-colors"
+                      >
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <div className="p-1.5 rounded-lg bg-gray-100 dark:bg-gray-900 text-gray-500 shrink-0">
+                            <Icon className="h-4 w-4 text-gray-550 dark:text-gray-400" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{item.title}</p>
+                            {item.subtitle && (
+                              <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{item.subtitle}</p>
+                            )}
+                          </div>
+                        </div>
+                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded border uppercase tracking-wider ${badgeClass} shrink-0 ml-3`}>
+                          {label}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

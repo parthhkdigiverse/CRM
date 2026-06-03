@@ -3,13 +3,14 @@ PDF generation service using ReportLab.
 """
 
 import io
+import os
 from datetime import datetime
 from typing import Optional, Dict
 from reportlab.lib.pagesizes import letter  # type: ignore
 from reportlab.lib import colors  # type: ignore
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle  # type: ignore
 from reportlab.lib.enums import TA_RIGHT, TA_LEFT, TA_CENTER  # type: ignore
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, KeepTogether  # type: ignore
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, KeepTogether, Image  # type: ignore
 
 def format_address(addr_dict: Optional[Dict]) -> str:
     """Format address dictionary into a multiline string."""
@@ -55,19 +56,30 @@ def generate_invoice_pdf(invoice, organization, company=None, contact=None) -> b
     # Primary theme colors
     primary_color = colors.HexColor('#6366F1')  # indigo-500
     primary_dark = colors.HexColor('#4F46E5')   # indigo-600
-    text_dark = colors.HexColor('#1F2937')      # gray-900
-    text_muted = colors.HexColor('#4B5563')     # gray-600
-    border_color = colors.HexColor('#E5E7EB')   # gray-200
-    bg_light = colors.HexColor('#F9FAFB')       # gray-50
+    text_dark = colors.HexColor('#1E293B')      # slate-800
+    text_muted = colors.HexColor('#64748B')     # slate-500
+    border_color = colors.HexColor('#E2E8F0')   # slate-200
+    bg_light = colors.HexColor('#F8FAFC')       # slate-50
+    bg_total = colors.HexColor('#EEF2FF')       # indigo-50
+    border_total = colors.HexColor('#C7D2FE')   # indigo-200
     
     title_style = ParagraphStyle(
         'InvoiceTitle',
         parent=styles['Normal'],
         fontName='Helvetica-Bold',
-        fontSize=24,
-        leading=28,
+        fontSize=28,
+        leading=32,
         textColor=primary_dark,
         alignment=TA_RIGHT
+    )
+    
+    org_name_style = ParagraphStyle(
+        'OrgName',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=16,
+        leading=20,
+        textColor=text_dark
     )
     
     normal_bold = ParagraphStyle(
@@ -100,28 +112,33 @@ def generate_invoice_pdf(invoice, organization, company=None, contact=None) -> b
         alignment=TA_RIGHT
     )
     
-    section_heading = ParagraphStyle(
-        'SectionHeading',
+    section_heading_small = ParagraphStyle(
+        'SectionHeadingSmall',
         parent=styles['Normal'],
         fontName='Helvetica-Bold',
-        fontSize=11,
-        leading=15,
-        textColor=primary_dark
+        fontSize=8,
+        leading=10,
+        textColor=text_muted
     )
     
     # Table styles
-    table_header_style = ParagraphStyle(
-        'TableHeader',
+    table_header_style_left = ParagraphStyle(
+        'TableHeaderLeft',
         parent=styles['Normal'],
         fontName='Helvetica-Bold',
         fontSize=9,
         leading=12,
-        textColor=colors.white
+        textColor=colors.white,
+        alignment=TA_LEFT
     )
     
     table_header_style_right = ParagraphStyle(
         'TableHeaderRight',
-        parent=table_header_style,
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=9,
+        leading=12,
+        textColor=colors.white,
         alignment=TA_RIGHT
     )
     
@@ -131,7 +148,8 @@ def generate_invoice_pdf(invoice, organization, company=None, contact=None) -> b
         fontName='Helvetica',
         fontSize=9,
         leading=12,
-        textColor=text_dark
+        textColor=text_dark,
+        alignment=TA_LEFT
     )
     
     table_cell_style_right = ParagraphStyle(
@@ -142,54 +160,54 @@ def generate_invoice_pdf(invoice, organization, company=None, contact=None) -> b
 
     story: list = []
     
-    # --- HEADER BLOCK (Org Info on Left, Invoice Info on Right) ---
+    # --- LOGO & BRANDING BLOCK ---
     org_name = organization.name if organization else "AI-Setu CRM"
     org_website = organization.website if (organization and organization.website) else ""
     org_address_str = format_address(organization.address) if organization else ""
     org_tax_id = f"Tax ID: {organization.tax_id}" if (organization and organization.tax_id) else ""
     
-    org_info_parts = [f"<b>{org_name}</b>"]
-    if org_address_str:
-        org_info_parts.append(org_address_str.replace('\n', '<br/>'))
-    if org_website:
-        org_info_parts.append(org_website)
-    if org_tax_id:
-        org_info_parts.append(org_tax_id)
+    # Safe Logo Image Loading
+    logo_flowable = None
+    if organization and organization.logo_url:
+        try:
+            logo_url = organization.logo_url
+            if logo_url.startswith("http://") or logo_url.startswith("https://"):
+                import httpx
+                r = httpx.get(logo_url, timeout=2.0)
+                if r.status_code == 200:
+                    img_data = io.BytesIO(r.content)
+                    logo_flowable = Image(img_data, height=35, width=105)
+            elif os.path.exists(logo_url):
+                logo_flowable = Image(logo_url, height=35, width=105)
+        except Exception:
+            # Fall back to text branding silently if image fetch fails
+            pass
+            
+    # Build org details column flowables
+    org_info_flowables: list = []
+    if logo_flowable:
+        org_info_flowables.append(logo_flowable)
+        org_info_flowables.append(Spacer(1, 6))
+    else:
+        org_info_flowables.append(Paragraph(org_name, org_name_style))
+        org_info_flowables.append(Spacer(1, 4))
         
-    org_info_html = "<br/>".join(org_info_parts)
-    
-    # Invoice metadata
-    inv_num = invoice.invoice_number
-    issue_date = invoice.created_at.strftime("%Y-%m-%d") if isinstance(invoice.created_at, datetime) else str(invoice.created_at)[:10]
-    due_date = invoice.due_date.strftime("%Y-%m-%d") if isinstance(invoice.due_date, datetime) else (str(invoice.due_date)[:10] if invoice.due_date else "N/A")
-    status_str = invoice.status.upper()
-    
-    # Status styling
-    status_color = "#9CA3AF" # gray-400 for draft
-    if invoice.status == "paid":
-        status_color = "#10B981" # emerald-500
-    elif invoice.status in ["pending", "sent"]:
-        status_color = "#F59E0B" # amber-500
-    elif invoice.status == "overdue":
-        status_color = "#EF4444" # red-500
-    
-    status_html = f'<font color="{status_color}"><b>{status_str}</b></font>'
-    
-    meta_info_html = f"""
-    <b>Invoice #:</b> {inv_num}<br/>
-    <b>Date:</b> {issue_date}<br/>
-    <b>Due Date:</b> {due_date}<br/>
-    <b>Status:</b> {status_html}
-    """
-    
+    if org_website:
+        org_info_flowables.append(Paragraph(org_website, normal_text))
+        org_info_flowables.append(Spacer(1, 2))
+    if org_address_str:
+        org_info_flowables.append(Paragraph(org_address_str.replace('\n', '<br/>'), normal_text))
+        org_info_flowables.append(Spacer(1, 2))
+    if org_tax_id:
+        org_info_flowables.append(Paragraph(org_tax_id, normal_text))
+        
     header_data = [
         [
-            Paragraph(org_info_html, normal_text),
-            Paragraph(f"INVOICE<br/><br/>{meta_info_html}", normal_text_right)
+            org_info_flowables,
+            Paragraph("INVOICE", title_style)
         ]
     ]
     
-    # Widths sum up to printable width: letter size width is 612 pt. Margins are 36 pt on each side, so printable width is 540 pt.
     header_table = Table(header_data, colWidths=[300, 240])
     header_table.setStyle(TableStyle([
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
@@ -202,17 +220,17 @@ def generate_invoice_pdf(invoice, organization, company=None, contact=None) -> b
     story.append(header_table)
     story.append(Spacer(1, 15))
     
-    # --- Accent line ---
+    # --- Accent Divider Line ---
     divider = Table([[""]], colWidths=[540])
     divider.setStyle(TableStyle([
-        ('LINEBELOW', (0, 0), (-1, -1), 2, primary_color),
+        ('LINEBELOW', (0, 0), (-1, -1), 1.5, primary_color),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
         ('TOPPADDING', (0, 0), (-1, -1), 0),
     ]))
     story.append(divider)
     story.append(Spacer(1, 15))
     
-    # --- BILL TO BLOCK ---
+    # --- CLIENT & METADATA SECTION (Two Columns) ---
     client_name = invoice.customer_name or ""
     client_email = ""
     client_phone = ""
@@ -228,7 +246,6 @@ def generate_invoice_pdf(invoice, organization, company=None, contact=None) -> b
         client_email = contact.email or ""
         client_phone = contact.phone or ""
         
-    # Fallback to customer_name if company/contact is not linked
     if not client_name and invoice.customer_name:
         client_name = invoice.customer_name
         
@@ -242,34 +259,88 @@ def generate_invoice_pdf(invoice, organization, company=None, contact=None) -> b
         
     bill_to_html = "<br/>".join(bill_to_parts)
     
-    bill_to_data = [
-        [
-            Paragraph("<b>BILL TO:</b>", section_heading),
-            ""
-        ],
-        [
-            Paragraph(bill_to_html, normal_text),
-            ""
-        ]
-    ]
+    # Invoice metadata
+    inv_num = invoice.invoice_number
+    issue_date = invoice.created_at.strftime("%Y-%m-%d") if isinstance(invoice.created_at, datetime) else str(invoice.created_at)[:10]
+    due_date = invoice.due_date.strftime("%Y-%m-%d") if isinstance(invoice.due_date, datetime) else (str(invoice.due_date)[:10] if invoice.due_date else "N/A")
+    status_str = invoice.status.upper()
     
-    bill_to_table = Table(bill_to_data, colWidths=[300, 240])
-    bill_to_table.setStyle(TableStyle([
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ('TOPPADDING', (0, 0), (-1, -1), 0),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+    # Professional Status Badging
+    badge_bg = "#F3F4F6"
+    badge_fg = "#4B5563"
+    if invoice.status == "paid":
+        badge_bg = "#D1FAE5"  # emerald-100
+        badge_fg = "#065F46"  # emerald-800
+    elif invoice.status in ["pending", "sent"]:
+        badge_bg = "#FEF3C7"  # amber-100
+        badge_fg = "#92400E"  # amber-800
+    elif invoice.status == "overdue":
+        badge_bg = "#FEE2E2"  # red-100
+        badge_fg = "#991B1B"  # red-800
+        
+    status_badge_style = ParagraphStyle(
+        'StatusBadge',
+        fontName='Helvetica-Bold',
+        fontSize=8,
+        leading=10,
+        textColor=colors.HexColor(badge_fg),
+        alignment=TA_CENTER
+    )
+    
+    status_badge = Table([[Paragraph(status_str, status_badge_style)]], colWidths=[65])
+    status_badge.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor(badge_bg)),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('TOPPADDING', (0, 0), (-1, -1), 3),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+        ('LEFTPADDING', (0, 0), (-1, -1), 5),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 5),
+    ]))
+    
+    # Meta details table structure
+    meta_details_data = [
+        [Paragraph("Invoice Number:", normal_bold), Paragraph(inv_num, normal_text)],
+        [Paragraph("Issue Date:", normal_bold), Paragraph(issue_date, normal_text)],
+        [Paragraph("Due Date:", normal_bold), Paragraph(due_date, normal_text)],
+        [Paragraph("Status:", normal_bold), status_badge]
+    ]
+    meta_details_table = Table(meta_details_data, colWidths=[90, 150])
+    meta_details_table.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('TOPPADDING', (0, 0), (-1, -1), 3),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
         ('LEFTPADDING', (0, 0), (-1, -1), 0),
         ('RIGHTPADDING', (0, 0), (-1, -1), 0),
     ]))
     
-    story.append(bill_to_table)
+    details_data = [
+        [
+            Paragraph("<b>BILL TO</b>", section_heading_small),
+            Paragraph("<b>INVOICE DETAILS</b>", section_heading_small)
+        ],
+        [
+            Paragraph(bill_to_html, normal_text),
+            meta_details_table
+        ]
+    ]
+    
+    details_table = Table(details_data, colWidths=[270, 270])
+    details_table.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('TOPPADDING', (0, 0), (-1, -1), 0),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+        ('LEFTPADDING', (0, 0), (-1, -1), 0),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+    ]))
+    
+    story.append(details_table)
     story.append(Spacer(1, 20))
     
     # --- ITEMS TABLE ---
-    # Header: Description, Qty, Unit Price (INR), Tax %, Amount (INR)
     table_data = [
         [
-            Paragraph("Description", table_header_style),
+            Paragraph("Description", table_header_style_left),
             Paragraph("Qty", table_header_style_right),
             Paragraph("Unit Price", table_header_style_right),
             Paragraph("Tax %", table_header_style_right),
@@ -277,10 +348,8 @@ def generate_invoice_pdf(invoice, organization, company=None, contact=None) -> b
         ]
     ]
     
-    # Populate items
     currency_code = invoice.currency or "INR"
     for item in invoice.line_items:
-        # Calculate amount
         qty = item.quantity
         price = item.unit_price
         tax = item.tax_percent
@@ -296,13 +365,16 @@ def generate_invoice_pdf(invoice, organization, company=None, contact=None) -> b
         
     items_table = Table(table_data, colWidths=[240, 50, 90, 60, 100])
     items_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), primary_color),
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1E293B')), # Professional Slate-800 Header
         ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 8),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ('TOPPADDING', (0, 0), (-1, -1), 9),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 9),
+        ('LEFTPADDING', (0, 0), (-1, -1), 10),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 10),
         ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, bg_light]),
-        ('GRID', (0, 0), (-1, -1), 0.5, border_color),
+        ('LINEBELOW', (0, 0), (-1, 0), 1.5, primary_color), # Elegant Indigo Accent Bar under Header
+        ('LINEBELOW', (0, 1), (-1, -1), 0.5, border_color), # Thin slate horizontal row lines
     ]))
     story.append(items_table)
     story.append(Spacer(1, 15))
@@ -323,12 +395,26 @@ def generate_invoice_pdf(invoice, organization, company=None, contact=None) -> b
     summary_rows.append(["Total:", f"{currency_code} {total_val:,.2f}"])
     
     summary_table_data = []
+    total_label_style = ParagraphStyle(
+        'TotalLabel',
+        parent=normal_bold_right,
+        fontSize=10,
+        leading=14,
+        textColor=primary_dark
+    )
+    total_val_style = ParagraphStyle(
+        'TotalVal',
+        parent=normal_bold_right,
+        fontSize=10,
+        leading=14,
+        textColor=primary_dark
+    )
+    
     for label, val in summary_rows:
         is_total = label == "Total:"
-        lbl_style = normal_bold_right if is_total else normal_text_right
-        val_style = normal_bold_right if is_total else normal_text_right
+        lbl_style = total_label_style if is_total else normal_text_right
+        val_style = total_val_style if is_total else normal_text_right
         
-        # Style Total row differently
         summary_table_data.append([
             Paragraph(f"<b>{label}</b>" if is_total else label, lbl_style),
             Paragraph(f"<b>{val}</b>" if is_total else val, val_style)
@@ -337,14 +423,17 @@ def generate_invoice_pdf(invoice, organization, company=None, contact=None) -> b
     summary_table = Table(summary_table_data, colWidths=[120, 120])
     summary_table.setStyle(TableStyle([
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-        ('TOPPADDING', (0, 0), (-1, -1), 4),
-        ('LEFTPADDING', (0, 0), (-1, -1), 0),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 0),
-        ('LINEABOVE', (0, -1), (-1, -1), 1, primary_color), # border above total
+        ('BOTTOMPADDING', (0, 0), (-1, -2), 5),
+        ('TOPPADDING', (0, 0), (-1, -2), 5),
+        ('LEFTPADDING', (0, 0), (-1, -1), 6),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+        ('LINEBELOW', (0, 0), (-1, -2), 0.5, bg_light), # very faint lines
+        ('BACKGROUND', (0, -1), (-1, -1), bg_total), # Highlight block for Total row
+        ('BOX', (0, -1), (-1, -1), 1, border_total), # Border around Total
+        ('TOPPADDING', (0, -1), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, -1), (-1, -1), 8),
     ]))
     
-    # Align summary table to the right
     wrapper_data = [["", summary_table]]
     wrapper_table = Table(wrapper_data, colWidths=[300, 240])
     wrapper_table.setStyle(TableStyle([
@@ -358,34 +447,44 @@ def generate_invoice_pdf(invoice, organization, company=None, contact=None) -> b
     story.append(wrapper_table)
     story.append(Spacer(1, 20))
     
-    # --- NOTES & TERMS SECTION (KeepTogether to avoid orphan section) ---
-    notes_parts: list = []
+    # --- NOTES & TERMS CALLOUT CARD ---
+    notes_content: list = []
     
     if invoice.notes:
-        notes_parts.append(Paragraph("<b>Notes:</b>", section_heading))
-        notes_parts.append(Paragraph(invoice.notes.replace('\n', '<br/>'), normal_text))
-        notes_parts.append(Spacer(1, 10))
+        notes_content.append(Paragraph("<b>Notes</b>", section_heading_small))
+        notes_content.append(Spacer(1, 4))
+        notes_content.append(Paragraph(invoice.notes.replace('\n', '<br/>'), normal_text))
         
     if invoice.payment_terms:
-        # Map some common keys to human readable labels or print them
-        terms_label = "Payment Terms / Methods"
-        notes_parts.append(Paragraph(f"<b>{terms_label}:</b>", section_heading))
-        notes_parts.append(Paragraph(invoice.payment_terms.replace('\n', '<br/>'), normal_text))
-        notes_parts.append(Spacer(1, 10))
+        if notes_content:
+            notes_content.append(Spacer(1, 10))
+        notes_content.append(Paragraph("<b>Payment Terms & Instructions</b>", section_heading_small))
+        notes_content.append(Spacer(1, 4))
+        notes_content.append(Paragraph(invoice.payment_terms.replace('\n', '<br/>'), normal_text))
         
-    # Default footer text
-    notes_parts.append(Spacer(1, 10))
-    notes_parts.append(Paragraph("<font color='#9CA3AF'>Thank you for your business!</font>", ParagraphStyle('ThankYou', parent=normal_text, alignment=TA_CENTER)))
-    
-    story.append(KeepTogether(notes_parts))
+    if notes_content:
+        notes_table = Table([[notes_content]], colWidths=[540])
+        notes_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), bg_light),
+            ('BOX', (0, 0), (-1, -1), 1, border_color),
+            ('TOPPADDING', (0, 0), (-1, -1), 12),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+            ('LEFTPADDING', (0, 0), (-1, -1), 12),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 12),
+        ]))
+        story.append(KeepTogether(notes_table))
     
     # Build Document
     def add_footer(canvas, doc):
         canvas.saveState()
+        # Clean bottom footer line
+        canvas.setStrokeColor(colors.HexColor('#E2E8F0'))
+        canvas.setLineWidth(0.5)
+        canvas.line(36, 35, letter[0] - 36, 35)
+        
         canvas.setFont('Helvetica', 8)
         canvas.setFillColor(colors.HexColor('#9CA3AF'))
-        # Draw page number centered
-        canvas.drawCentredString(letter[0]/2.0, 20, f"Page {doc.page} • Generated by AI-Setu CRM")
+        canvas.drawCentredString(letter[0]/2.0, 20, f"Page {doc.page} • Generated by {org_name}")
         canvas.restoreState()
         
     doc.build(story, onFirstPage=add_footer, onLaterPages=add_footer)

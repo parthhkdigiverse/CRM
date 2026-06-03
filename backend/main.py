@@ -17,7 +17,7 @@ from config import settings
 from database import init_db, close_db
 from middleware.security import RequestSecurityMiddleware, SecurityHeadersMiddleware
 from schemas.common import ErrorResponse, ErrorDetail
-from routers import auth, organization, contact, company, lead, deal, invoice, task, employee, ai, attendance, project, meeting, document, audit_log, target, super_admin, payroll, leave, chat, inventory, sale, finance, reports, expense, overtime, notification, meta
+from routers import auth, organization, contact, company, lead, deal, invoice, task, employee, ai, attendance, project, meeting, document, audit_log, target, super_admin, payroll, leave, chat, inventory, sale, finance, reports, expense, overtime, notification, meta, search
 from utils.logging import configure_secure_logging, redact
 
 configure_secure_logging(logging.INFO if not settings.is_production else logging.WARNING)
@@ -172,6 +172,7 @@ app.include_router(overtime.router)
 app.include_router(notification.router)
 app.include_router(meta.router)
 app.include_router(meta.webhook_router)
+app.include_router(search.router)
 
 
 @app.get("/api/health", tags=["System"])

@@ -88,6 +88,64 @@ async def list_invoices(
     return PaginatedResponse(**response_data)
 
 
+@router.get("/export")
+async def export_invoices_csv(
+    current_user: User = Depends(require_module_read("invoices")),
+    org: Optional[Organization] = Depends(get_current_org)
+):
+    """Export all organization invoices to a CSV file."""
+    import csv
+    import io
+    from fastapi.responses import StreamingResponse
+
+    query = org_filter(org)
+    invoices = await Invoice.find(query).sort("-created_at").to_list()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    # Write CSV Header
+    writer.writerow([
+        "Invoice Number", "Client/Customer", "Status", "Currency",
+        "Subtotal", "Discount", "Tax Amount", "Total Amount",
+        "Issue Date", "Due Date", "Created At", "Line Items"
+    ])
+
+    for inv in invoices:
+        issue_date = inv.created_at.strftime("%Y-%m-%d") if isinstance(inv.created_at, datetime) else str(inv.created_at)[:10]
+        due_date = inv.due_date.strftime("%Y-%m-%d") if isinstance(inv.due_date, datetime) else (str(inv.due_date)[:10] if inv.due_date else "N/A")
+        created_at = inv.created_at.strftime("%Y-%m-%d %H:%M:%S") if isinstance(inv.created_at, datetime) else str(inv.created_at)
+
+        # Summarize line items
+        items_summary = "; ".join([
+            f"{item.description} (Qty: {item.quantity}, Price: {item.unit_price}, Tax: {item.tax_percent}%)"
+            for item in inv.line_items
+        ])
+
+        writer.writerow([
+            inv.invoice_number,
+            inv.customer_name or "Unknown",
+            inv.status.upper(),
+            inv.currency or "INR",
+            f"{inv.subtotal:.2f}",
+            f"{inv.discount:.2f}",
+            f"{inv.tax_amount:.2f}",
+            f"{inv.total:.2f}",
+            issue_date,
+            due_date,
+            created_at,
+            items_summary
+        ])
+
+    output.seek(0)
+    response = StreamingResponse(
+        io.BytesIO(output.getvalue().encode("utf-8-sig")),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=invoices_export.csv"}
+    )
+    return response
+
+
 @router.get("/{invoice_id}", response_model=SuccessResponse)
 async def get_invoice(
     invoice_id: str,

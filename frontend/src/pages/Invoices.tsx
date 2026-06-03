@@ -116,6 +116,29 @@ export default function Invoices() {
     }
   };
 
+  const handleExportCSV = async () => {
+    const loadingToast = toast.loading('Exporting invoices to CSV...');
+    try {
+      const response = await apiClient.get('/invoices/export', {
+        responseType: 'blob'
+      });
+      const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8;' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'invoices_export.csv');
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode?.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      toast.dismiss(loadingToast);
+      toast.success('Invoices exported successfully');
+    } catch (error) {
+      toast.dismiss(loadingToast);
+      toast.error('Failed to export invoices');
+    }
+  };
+
   const pendingProjects = completedProjects.filter(project => {
     const hasInvoice = invoices.some(inv => 
       inv.notes && inv.notes.includes(`Project Code: ${project.project_code}`)
@@ -132,7 +155,7 @@ export default function Invoices() {
           <p className="text-gray-500 dark:text-gray-400 mt-1">Create, send and track your invoices.</p>
         </div>
         <div className="flex items-center gap-3">
-          <Button variant="outline" className="bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800 rounded-xl h-9 px-4" onClick={() => toast('Coming soon!')}>
+          <Button variant="outline" className="bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800 rounded-xl h-9 px-4" onClick={handleExportCSV}>
             <Download className="h-4 w-4 mr-2 text-gray-500" /> Export
           </Button>
           <Button className="bg-purple-600 hover:bg-purple-700 text-white rounded-xl h-9 px-4" onClick={() => setDialogOpen(true)}>

@@ -8,8 +8,19 @@ import {
   RefreshCcw,
   Loader2,
   Download,
-  DollarSign
+  DollarSign,
+  ChevronDown,
+  FileSpreadsheet,
+  FileText
 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
 import {
   AreaChart,
   Area,
@@ -81,6 +92,53 @@ export default function Reports() {
     window.print();
   };
 
+  const exportToCSV = (jsonData: any[], headers: string[], keys: string[], filename: string) => {
+    const csvRows = [];
+    csvRows.push('\ufeff' + headers.join(','));
+    
+    for (const row of jsonData) {
+      const values = keys.map(key => {
+        const val = row[key];
+        if (typeof val === 'string') {
+          return `"${val.replace(/"/g, '""')}"`;
+        }
+        return val;
+      });
+      csvRows.push(values.join(','));
+    }
+    
+    const csvContent = csvRows.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    link.parentNode?.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  };
+
+  const handleExportFinancials = () => {
+    if (!data?.financial) return;
+    exportToCSV(
+      data.financial,
+      ['Month', 'Revenue (INR)', 'Expense (INR)', 'Profit (INR)'],
+      ['month', 'revenue', 'expense', 'profit'],
+      'financial_analytics.csv'
+    );
+  };
+
+  const handleExportSales = () => {
+    if (!data?.sales) return;
+    exportToCSV(
+      data.sales,
+      ['Month', 'Completed (INR)', 'Pending (INR)', 'Cancelled (INR)'],
+      ['month', 'completed', 'pending', 'cancelled'],
+      'sales_pipeline_analytics.csv'
+    );
+  };
+
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center min-h-[400px]">
@@ -143,13 +201,38 @@ export default function Reports() {
             <RefreshCcw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
-          <Button
-            className="bg-purple-600 hover:bg-purple-700 text-white rounded-xl h-10 shadow-md hover:shadow-lg transition-all"
-            onClick={handleExportPDF}
-          >
-            <Download className="h-4 w-4 mr-2" />
-            Export PDF
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                className="bg-purple-600 hover:bg-purple-700 text-white rounded-xl h-10 shadow-md hover:shadow-lg transition-all gap-1"
+              >
+                <Download className="h-4 w-4 mr-1" />
+                Export Report
+                <ChevronDown className="h-3 w-3 opacity-80 ml-1" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56 rounded-xl mt-1">
+              <DropdownMenuLabel className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider px-2 py-1">
+                Formats
+              </DropdownMenuLabel>
+              <DropdownMenuItem className="cursor-pointer flex items-center gap-2 py-2" onClick={handleExportPDF}>
+                <FileText className="h-4 w-4 text-gray-550 dark:text-gray-400" />
+                <span>Download PDF Report</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider px-2 py-1">
+                Data Tables (Excel/CSV)
+              </DropdownMenuLabel>
+              <DropdownMenuItem className="cursor-pointer flex items-center gap-2 py-2" onClick={handleExportFinancials}>
+                <FileSpreadsheet className="h-4 w-4 text-gray-550 dark:text-gray-400" />
+                <span>Export Financials</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem className="cursor-pointer flex items-center gap-2 py-2" onClick={handleExportSales}>
+                <FileSpreadsheet className="h-4 w-4 text-gray-550 dark:text-gray-400" />
+                <span>Export Sales Pipeline</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 

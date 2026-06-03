@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { 
-  User, Building2, Bell, Shield, CreditCard, Puzzle, Camera, Loader2, History, Users, MoreVertical, ShieldCheck
+  User, Building2, Bell, Shield, CreditCard, Puzzle, Camera, Loader2, History, Users, MoreVertical, ShieldCheck,
+  Lock, Eye, EyeOff, CheckCircle2, AlertCircle
 } from 'lucide-react';
 import { 
   DropdownMenu,
@@ -396,13 +397,241 @@ function TeamMembersView() {
   );
 }
 
+function ChangePasswordView() {
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [success, setSuccess] = useState(false);
+
+  const getPasswordStrength = (password: string) => {
+    if (!password) return { score: 0, label: '', color: '' };
+    let score = 0;
+    if (password.length >= 8) score++;
+    if (password.length >= 12) score++;
+    if (/[A-Z]/.test(password)) score++;
+    if (/[a-z]/.test(password)) score++;
+    if (/[0-9]/.test(password)) score++;
+    if (/[^A-Za-z0-9]/.test(password)) score++;
+
+    if (score <= 2) return { score: 1, label: 'Weak', color: 'bg-red-500' };
+    if (score <= 4) return { score: 2, label: 'Fair', color: 'bg-amber-500' };
+    if (score <= 5) return { score: 3, label: 'Good', color: 'bg-blue-500' };
+    return { score: 4, label: 'Strong', color: 'bg-emerald-500' };
+  };
+
+  const strength = getPasswordStrength(newPassword);
+  const passwordsMatch = confirmPassword.length > 0 && newPassword === confirmPassword;
+  const passwordsMismatch = confirmPassword.length > 0 && newPassword !== confirmPassword;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword !== confirmPassword) {
+      toast.error('New passwords do not match');
+      return;
+    }
+    if (newPassword.length < 8) {
+      toast.error('Password must be at least 8 characters');
+      return;
+    }
+    setSaving(true);
+    setSuccess(false);
+    try {
+      await apiClient.post('/auth/change-password', {
+        current_password: currentPassword,
+        new_password: newPassword,
+      });
+      setSuccess(true);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      toast.success('Password changed successfully! 🔒');
+    } catch (error: any) {
+      const msg = error?.response?.data?.detail || 'Failed to change password';
+      toast.error(msg);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Card className="border-0 shadow-sm rounded-2xl bg-white dark:bg-gray-950">
+      <CardHeader className="p-6 pb-4">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center">
+            <Lock className="h-5 w-5 text-white" />
+          </div>
+          <div>
+            <CardTitle className="text-lg font-bold">Change Password</CardTitle>
+            <p className="text-sm text-gray-500 mt-0.5">Update your password to keep your account secure.</p>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="p-6 pt-0">
+        {success && (
+          <div className="mb-6 flex items-center gap-3 p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/50">
+            <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+            <p className="text-sm text-emerald-700 dark:text-emerald-300 font-medium">Your password has been updated successfully.</p>
+          </div>
+        )}
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Current Password */}
+          <div className="space-y-2">
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Current Password</label>
+            <div className="relative">
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                type={showCurrent ? 'text' : 'password'}
+                value={currentPassword}
+                onChange={(e: any) => setCurrentPassword(e.target.value)}
+                placeholder="Enter your current password"
+                className="pl-10 pr-10 rounded-xl border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowCurrent(!showCurrent)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+              >
+                {showCurrent ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+          </div>
+
+          {/* New Password */}
+          <div className="space-y-2">
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">New Password</label>
+            <div className="relative">
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                type={showNew ? 'text' : 'password'}
+                value={newPassword}
+                onChange={(e: any) => setNewPassword(e.target.value)}
+                placeholder="Enter a new password"
+                className="pl-10 pr-10 rounded-xl border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50"
+                required
+                minLength={8}
+              />
+              <button
+                type="button"
+                onClick={() => setShowNew(!showNew)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+              >
+                {showNew ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+            {/* Strength Indicator */}
+            {newPassword && (
+              <div className="space-y-1.5 pt-1">
+                <div className="flex gap-1">
+                  {[1, 2, 3, 4].map((level) => (
+                    <div
+                      key={level}
+                      className={cn(
+                        'h-1.5 flex-1 rounded-full transition-all duration-300',
+                        level <= strength.score ? strength.color : 'bg-gray-200 dark:bg-gray-800'
+                      )}
+                    />
+                  ))}
+                </div>
+                <p className={cn(
+                  'text-xs font-medium',
+                  strength.score <= 1 ? 'text-red-500' :
+                  strength.score <= 2 ? 'text-amber-500' :
+                  strength.score <= 3 ? 'text-blue-500' : 'text-emerald-500'
+                )}>
+                  {strength.label}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Confirm Password */}
+          <div className="space-y-2">
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Confirm New Password</label>
+            <div className="relative">
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                type={showConfirm ? 'text' : 'password'}
+                value={confirmPassword}
+                onChange={(e: any) => setConfirmPassword(e.target.value)}
+                placeholder="Re-enter your new password"
+                className={cn(
+                  'pl-10 pr-10 rounded-xl bg-gray-50/50 dark:bg-gray-900/50 transition-colors',
+                  passwordsMatch ? 'border-emerald-400 dark:border-emerald-600' :
+                  passwordsMismatch ? 'border-red-400 dark:border-red-600' :
+                  'border-gray-200 dark:border-gray-800'
+                )}
+                required
+                minLength={8}
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirm(!showConfirm)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+              >
+                {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+            {passwordsMatch && (
+              <p className="text-xs text-emerald-500 flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5" /> Passwords match</p>
+            )}
+            {passwordsMismatch && (
+              <p className="text-xs text-red-500 flex items-center gap-1"><AlertCircle className="h-3.5 w-3.5" /> Passwords do not match</p>
+            )}
+          </div>
+
+          {/* Password Requirements */}
+          <div className="rounded-xl bg-gray-50 dark:bg-gray-900/50 border border-gray-100 dark:border-gray-800 p-4">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Password Requirements</p>
+            <ul className="space-y-1">
+              {[
+                { rule: 'At least 8 characters', met: newPassword.length >= 8 },
+                { rule: 'One uppercase letter (A-Z)', met: /[A-Z]/.test(newPassword) },
+                { rule: 'One lowercase letter (a-z)', met: /[a-z]/.test(newPassword) },
+                { rule: 'One number (0-9)', met: /[0-9]/.test(newPassword) },
+                { rule: 'One special character (!@#$...)', met: /[^A-Za-z0-9]/.test(newPassword) },
+              ].map((item) => (
+                <li key={item.rule} className={cn(
+                  'text-xs flex items-center gap-2 transition-colors',
+                  newPassword ? (item.met ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-400 dark:text-gray-600') : 'text-gray-400 dark:text-gray-600'
+                )}>
+                  {newPassword && item.met ? (
+                    <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                  ) : (
+                    <div className="h-3.5 w-3.5 shrink-0 rounded-full border border-current" />
+                  )}
+                  {item.rule}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <Button
+              type="submit"
+              className="bg-purple-600 hover:bg-purple-700 text-white rounded-xl h-10 px-8 font-medium"
+              disabled={saving || !currentPassword || !newPassword || !confirmPassword || passwordsMismatch}
+            >
+              {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Update Password
+            </Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function Settings() {
   const [activeTab, setActiveTab] = useState('profile');
   const { user, organization, updateUser } = useAuthStore();
   
   const isRestricted = user?.role === 'employee' || user?.role === 'hr';
-  const visibleTabs = isRestricted ? tabs.filter(t => t.id === 'profile') : tabs;
+  const visibleTabs = isRestricted ? tabs.filter(t => t.id === 'profile' || t.id === 'security') : tabs;
 
   // Profile Form State
   const [firstName, setFirstName] = useState('');
@@ -785,7 +1014,13 @@ export default function Settings() {
             </div>
           )}
 
-          {activeTab !== 'profile' && activeTab !== 'organization' && activeTab !== 'audit' && activeTab !== 'integrations' && activeTab !== 'feature-access' && activeTab !== 'notifications' && (
+          {activeTab === 'security' && (
+            <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+              <ChangePasswordView />
+            </div>
+          )}
+
+          {activeTab !== 'profile' && activeTab !== 'organization' && activeTab !== 'audit' && activeTab !== 'integrations' && activeTab !== 'feature-access' && activeTab !== 'notifications' && activeTab !== 'security' && activeTab !== 'team' && (
             <Card className="border-0 shadow-sm rounded-2xl bg-white dark:bg-gray-950">
               <CardContent className="p-12 text-center">
                 <div className="h-14 w-14 bg-gray-100 dark:bg-gray-900 rounded-2xl flex items-center justify-center mx-auto mb-4">

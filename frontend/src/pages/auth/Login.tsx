@@ -374,13 +374,6 @@ export default function Login() {
                   )}
                 </Button>
 
-                {/* Footer link */}
-                <div className="text-center text-sm text-slate-500 dark:text-slate-400">
-                  Don't have an account?{' '}
-                  <Link to="/register" className="font-bold text-violet-600 dark:text-violet-400 hover:underline hover:text-violet-700 dark:hover:text-violet-300 transition-colors">
-                    Create account
-                  </Link>
-                </div>
 
               </CardFooter>
             </form>

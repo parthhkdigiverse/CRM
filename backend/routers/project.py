@@ -27,7 +27,7 @@ async def create_project(
     org: Optional[Organization] = Depends(get_current_org)
 ):
     # Check if project code is unique within this org
-    existing = await Project.find_one(Project.project_code == data.project_code, Project.org_id == org.id, Project.is_deleted == False)
+    existing = await Project.find_one(Project.project_code == data.project_code, Project.org_id == (org.id if org else None), Project.is_deleted == False)
     if existing:
         raise HTTPException(status_code=400, detail="Project code already exists in this organization")
 
@@ -260,7 +260,7 @@ async def update_project(
         try:
             from models.invoice import Invoice
             existing_invoice = await Invoice.find_one(
-                Invoice.org_id == (project.org_id or org.id),
+                Invoice.org_id == (project.org_id or (org.id if org else None)),
                 Invoice.is_deleted == False,
                 {"notes": {"$regex": f"Project Code: {project.project_code}"}}
             )

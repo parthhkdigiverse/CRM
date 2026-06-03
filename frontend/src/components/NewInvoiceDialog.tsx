@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Download } from 'lucide-react';
 import { apiClient } from '@/lib/axios';
 import { toast } from 'sonner';
 import FormDrawer, { FormField, ChipSelect, inputClass, selectClass, textareaClass } from '@/components/FormDrawer';
@@ -160,6 +160,31 @@ export default function NewInvoiceDialog({ open, onOpenChange, onCreated, invoic
     }
   };
 
+  const handleDownloadPDF = async () => {
+    if (!invoice?.id) return;
+    const invNum = invoice.invoice_number || `INV-${invoice.id.substring(0, 6)}`;
+    const loadingToast = toast.loading(`Generating PDF for ${invNum}...`);
+    try {
+      const response = await apiClient.get(`/invoices/${invoice.id}/pdf`, {
+        responseType: 'blob'
+      });
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `${invNum}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode?.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      toast.dismiss(loadingToast);
+      toast.success(`Invoice ${invNum} downloaded`);
+    } catch (error) {
+      toast.dismiss(loadingToast);
+      toast.error('Failed to download invoice PDF');
+    }
+  };
+
   const handleSave = async () => {
     const ok = await submit();
     if (ok) { setForm({ ...emptyForm }); setItems([{ ...emptyItem }]); onOpenChange(false); onCreated(); }
@@ -252,7 +277,7 @@ export default function NewInvoiceDialog({ open, onOpenChange, onCreated, invoic
       </MoreDetails>
 
       {invoice && (
-        <div className="border-t border-gray-100 dark:border-gray-800 pt-3 mt-4">
+        <div className="border-t border-gray-100 dark:border-gray-800 pt-3 mt-4 flex justify-between items-center">
           <Button 
             type="button" 
             variant="ghost" 
@@ -262,6 +287,16 @@ export default function NewInvoiceDialog({ open, onOpenChange, onCreated, invoic
             disabled={loading}
           >
             <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Delete Invoice
+          </Button>
+          <Button 
+            type="button" 
+            variant="outline" 
+            size="sm" 
+            className="border-purple-200 text-purple-600 hover:bg-purple-50 dark:border-purple-900/50 dark:text-purple-400 dark:hover:bg-purple-950/20 rounded-xl"
+            onClick={handleDownloadPDF}
+            disabled={loading}
+          >
+            <Download className="h-3.5 w-3.5 mr-1.5" /> Download PDF
           </Button>
         </div>
       )}

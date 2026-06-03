@@ -42,7 +42,7 @@ async def create_meeting(
         attendee_ids=attendees
     )
     await meeting.insert()
-    await log_action(str(org.id) if org else None, str(current_user.id), "create", "meetings", str(meeting.id), changes={"title": data.title})
+    await log_action(str(org.id) if org else "super_admin", str(current_user.id), "create", "meetings", str(meeting.id), changes={"title": data.title})
     
     # Notify attendees
     try:
@@ -140,7 +140,7 @@ async def update_meeting(
     changes_logged = update_data.copy()
     if "attendee_ids" in changes_logged:
         changes_logged["attendee_ids"] = [str(aid) for aid in changes_logged["attendee_ids"]]
-    await log_action(str(org.id) if org else None, str(current_user.id), "update", "meetings", str(meeting.id), changes=changes_logged)
+    await log_action(str(org.id) if org else "super_admin", str(current_user.id), "update", "meetings", str(meeting.id), changes=changes_logged)
 
     return SuccessResponse(message="Meeting updated successfully")
 
@@ -167,6 +167,6 @@ async def delete_meeting(
     meeting.updated_at = utc_now()
     await meeting.save()
 
-    await log_action(str(org.id) if org else None, str(current_user.id), "delete", "meetings", str(meeting.id), changes={"title": meeting.title})
+    await log_action(str(org.id) if org else "super_admin", str(current_user.id), "delete", "meetings", str(meeting.id), changes={"title": meeting.title})
 
     return SuccessResponse(message="Meeting deleted successfully")

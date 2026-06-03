@@ -171,7 +171,8 @@ async def mark_invoice_paid(
                 {"org_id": org.id, "role": {"$in": ["admin", "super_admin"]}}
             ).to_list()
             for admin in admins:
-                notify_user_ids.add(admin.id)
+                if admin.id is not None:
+                    notify_user_ids.add(admin.id)
                 
             for uid in notify_user_ids:
                 notif = Notification(
@@ -211,6 +212,41 @@ async def delete_invoice(
     await log_action(str(org.id) if org else "super_admin", str(current_user.id), "delete", "invoices", str(invoice.id))
     
     return SuccessResponse(message="Invoice deleted successfully")
+
+
+@router.get("/{invoice_id}/pdf")
+async def download_invoice_pdf(
+    invoice_id: str,
+    current_user: User = Depends(require_module_read("invoices")),
+    org: Optional[Organization] = Depends(get_current_org)
+):
+    from fastapi import Response
+    from models.company import Company
+    from models.contact import Contact
+    from services.pdf_service import generate_invoice_pdf
+
+    invoice = await Invoice.find_one(org_filter(org, {"_id": PydanticObjectId(invoice_id)}))
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    company = None
+    if invoice.company_id:
+        company = await Company.get(invoice.company_id)
+
+    contact = None
+    if invoice.contact_id:
+        contact = await Contact.get(invoice.contact_id)
+
+    try:
+        pdf_bytes = generate_invoice_pdf(invoice, org, company, contact)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate invoice PDF: {str(e)}")
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={invoice.invoice_number}.pdf"}
+    )
 
 
 async def sync_invoice_to_sale(invoice: Invoice) -> None:

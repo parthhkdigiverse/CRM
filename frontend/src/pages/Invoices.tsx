@@ -93,6 +93,29 @@ export default function Invoices() {
     }
   };
 
+  const handleDownloadPDF = async (invoiceId: string, invoiceNumber: string) => {
+    const loadingToast = toast.loading(`Generating PDF for ${invoiceNumber}...`);
+    try {
+      const response = await apiClient.get(`/invoices/${invoiceId}/pdf`, {
+        responseType: 'blob'
+      });
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `${invoiceNumber}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode?.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      toast.dismiss(loadingToast);
+      toast.success(`Invoice ${invoiceNumber} downloaded`);
+    } catch (error) {
+      toast.dismiss(loadingToast);
+      toast.error('Failed to download invoice PDF');
+    }
+  };
+
   const pendingProjects = completedProjects.filter(project => {
     const hasInvoice = invoices.some(inv => 
       inv.notes && inv.notes.includes(`Project Code: ${project.project_code}`)
@@ -208,6 +231,7 @@ export default function Invoices() {
                   <th className="px-6 py-4 font-semibold tracking-wider">Issue Date</th>
                   <th className="px-6 py-4 font-semibold tracking-wider">Due Date</th>
                   <th className="px-6 py-4 font-semibold tracking-wider text-center">Status</th>
+                  <th className="px-6 py-4 font-semibold tracking-wider text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
@@ -227,6 +251,19 @@ export default function Invoices() {
                     <td className="px-6 py-4 text-gray-500">{inv.due_date ? new Date(inv.due_date).toLocaleDateString() : 'N/A'}</td>
                     <td className="px-6 py-4 text-center">
                       <span className={cn("px-2.5 py-1 rounded-full text-xs font-bold capitalize", statusColors[inv.status] || statusColors.draft)}>{inv.status}</span>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-gray-500 hover:text-purple-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDownloadPDF(inv.id, inv.invoice_number || `INV-${inv.id.substring(0,6)}`);
+                        }}
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
                     </td>
                   </tr>
                 ))}

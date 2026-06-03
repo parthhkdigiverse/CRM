@@ -70,8 +70,8 @@ async def get_finance_summary(
     # ── Monthly cash-flow (last 6 months) ─────────────────────────────
 
     months_label = []
-    monthly_income = []
-    monthly_expense = []
+    monthly_income: list[float] = []
+    monthly_expense: list[float] = []
 
     for i in range(5, -1, -1):
         m = now.month - i

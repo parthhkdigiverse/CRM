@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
-  Loader2, Plug, CheckCircle2, AlertTriangle, Copy, Eye, EyeOff, RefreshCw, Trash2,
+  Loader2, Plug, CheckCircle2, AlertTriangle, Copy, Eye, EyeOff, RefreshCw,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {

@@ -64,6 +64,16 @@ def _cookie_kwargs(request: Request, max_age: int) -> dict:
     }
 
 
+def _cookie_kwargs_client(request: Request, max_age: int) -> dict:
+    """
+    Build client-readable companion cookie kwargs.
+    Same as _cookie_kwargs but with httponly=False so JS can read it.
+    """
+    kwargs = _cookie_kwargs(request, max_age)
+    kwargs["httponly"] = False
+    return kwargs
+
+
 @router.post("/register", response_model=SuccessResponse, dependencies=[Depends(rate_limit(5, 60))])
 async def register(data: RegisterRequest):
     """Register a new user account."""
@@ -95,9 +105,10 @@ async def login(data: LoginRequest, request: Request, response: Response):
             data.email, data.password, data.remember_me, ip, user_agent
         )
 
-        # Set HTTP-only cookie for refresh token
+        # Set HTTP-only cookie for refresh token and companion cookie for frontend checking
         max_age = 30 * 24 * 60 * 60 if data.remember_me else 7 * 24 * 60 * 60
         response.set_cookie("refresh_token", refresh_token, **_cookie_kwargs(request, max_age))
+        response.set_cookie("has_refresh_token", "true", **_cookie_kwargs_client(request, max_age))
 
         return SuccessResponse(
             data={
@@ -124,6 +135,7 @@ async def refresh(request: Request, response: Response):
     """Refresh access token using refresh token cookie."""
     refresh_token = request.cookies.get("refresh_token")
     if not refresh_token:
+        response.delete_cookie("has_refresh_token", path="/")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No refresh token provided")
 
     try:
@@ -131,13 +143,15 @@ async def refresh(request: Request, response: Response):
         user_agent = request.headers.get("user-agent", "")
         new_access, new_refresh = await auth_service.refresh_access_token(refresh_token, ip, user_agent)
 
-        # Update cookie
+        # Update cookies
         response.set_cookie("refresh_token", new_refresh, **_cookie_kwargs(request, 7 * 24 * 60 * 60))
+        response.set_cookie("has_refresh_token", "true", **_cookie_kwargs_client(request, 7 * 24 * 60 * 60))
 
         return SuccessResponse(data={"access_token": new_access, "token_type": "bearer"})
     except ValueError as e:
-        # Clear invalid cookie
-        response.delete_cookie("refresh_token")
+        # Clear invalid cookies
+        response.delete_cookie("refresh_token", path="/")
+        response.delete_cookie("has_refresh_token", path="/")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
 
 
@@ -147,7 +161,8 @@ async def logout(request: Request, response: Response):
     refresh_token = request.cookies.get("refresh_token")
     if refresh_token:
         await auth_service.logout_user(refresh_token)
-        response.delete_cookie("refresh_token")
+        response.delete_cookie("refresh_token", path="/")
+    response.delete_cookie("has_refresh_token", path="/")
     return SuccessResponse(message="Logged out successfully")
 
 
@@ -167,17 +182,21 @@ async def google_callback(code: str, request: Request, response: Response):
     try:
         user, access_token, refresh_token = await oauth_service.handle_google_callback(code)
 
-        # Set cookie
-        response.set_cookie("refresh_token", refresh_token, **_cookie_kwargs(request, 7 * 24 * 60 * 60))
-
-        # Do not place bearer tokens in URLs. The frontend can call /refresh using the secure cookie.
         from config import settings
         frontend_url = f"{settings.FRONTEND_URL}/oauth/callback"
-        return RedirectResponse(url=frontend_url)
+        res = RedirectResponse(url=frontend_url)
+        
+        # Set cookies on the redirect response itself
+        res.set_cookie("refresh_token", refresh_token, **_cookie_kwargs(request, 7 * 24 * 60 * 60))
+        res.set_cookie("has_refresh_token", "true", **_cookie_kwargs_client(request, 7 * 24 * 60 * 60))
+        return res
     except ValueError as e:
         # Redirect to frontend with error
         from config import settings
-        return RedirectResponse(url=f"{settings.FRONTEND_URL}/login?error=oauth_failed")
+        res = RedirectResponse(url=f"{settings.FRONTEND_URL}/login?error=oauth_failed")
+        res.delete_cookie("refresh_token", path="/")
+        res.delete_cookie("has_refresh_token", path="/")
+        return res
 
 
 @router.post("/forgot-password", response_model=SuccessResponse, dependencies=[Depends(rate_limit(3, 60))])

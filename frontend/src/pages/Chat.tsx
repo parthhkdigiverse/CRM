@@ -218,7 +218,15 @@ export default function Chat() {
       }
     };
     ws.current = socket;
-    return () => socket.close();
+    return () => {
+      if (socket.readyState === WebSocket.CONNECTING) {
+        socket.onopen = () => {
+          socket.close();
+        };
+      } else {
+        socket.close();
+      }
+    };
   }, [accessToken]);
 
   const refreshRooms = async () => { const r = await apiClient.get('/chat/rooms'); setRooms(r.data.data || []); };

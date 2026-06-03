@@ -49,6 +49,16 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401 && !originalRequest._retry && !originalRequest.url?.includes('/auth/refresh')) {
       originalRequest._retry = true;
 
+      const hasCookie = document.cookie.split(';').some(item => item.trim().startsWith('has_refresh_token='));
+      if (!hasCookie) {
+        localStorage.removeItem('ai-setu-auth');
+        toast.error('Session expired — redirecting to login...');
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 1200);
+        return Promise.reject(error);
+      }
+
       if (!isRefreshing) {
         isRefreshing = true;
         try {

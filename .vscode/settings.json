@@ -3,5 +3,13 @@
   "python.pyrefly.configPath": "${workspaceFolder}/pyrefly.toml",
   "python.analysis.extraPaths": [
     "${workspaceFolder}/backend"
+  ],
+  "python.analysis.exclude": [
+    "**/_pyrefly_virtual_/**",
+    "**/__pyrefly_virtual__/**",
+    "C:/_pyrefly_virtual_/**",
+    "c:/_pyrefly_virtual_/**",
+    "C:/__pyrefly_virtual__/**",
+    "c:/__pyrefly_virtual__/**"
   ]
 }

@@ -20,7 +20,7 @@ class Activity(Document):
     metadata: Dict = Field(default_factory=dict)
 
     # Base fields
-    org_id: PydanticObjectId
+    org_id: Optional[PydanticObjectId] = None
     created_by: PydanticObjectId
     updated_by: Optional[PydanticObjectId] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

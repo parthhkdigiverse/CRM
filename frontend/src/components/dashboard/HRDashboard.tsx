@@ -4,9 +4,7 @@ import { Button } from '@/components/ui/button';
 import { 
   Users, 
   CalendarDays, 
-  UserPlus, 
   Clock,
-  ArrowUpRight,
   Loader2,
   FileText
 } from 'lucide-react';

@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 async def log_action(
-    org_id: str,
+    org_id: Optional[str],
     user_id: str,
     action: str,
     module: str,
@@ -31,8 +31,15 @@ async def log_action(
     This function is fire-and-forget — errors are logged but never raised.
     """
     try:
+        parsed_org_id = None
+        if org_id and org_id != "super_admin":
+            try:
+                parsed_org_id = PydanticObjectId(org_id)
+            except Exception:
+                pass
+
         entry = AuditLog(
-            org_id=PydanticObjectId(org_id),
+            org_id=parsed_org_id,
             user_id=PydanticObjectId(user_id),
             action=action,
             module=module,
@@ -48,7 +55,7 @@ async def log_action(
 
 
 async def log_activity(
-    org_id: str,
+    org_id: Optional[str],
     user_id: str,
     activity_type: str,
     description: str,
@@ -61,8 +68,15 @@ async def log_activity(
     This function is fire-and-forget — errors are logged but never raised.
     """
     try:
+        parsed_org_id = None
+        if org_id and org_id != "super_admin":
+            try:
+                parsed_org_id = PydanticObjectId(org_id)
+            except Exception:
+                pass
+
         entry = Activity(
-            org_id=PydanticObjectId(org_id),
+            org_id=parsed_org_id,
             type=activity_type,
             description=description,
             entity_type=entity_type,

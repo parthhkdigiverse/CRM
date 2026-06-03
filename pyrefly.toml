@@ -1,4 +1,4 @@
 project-includes = ["backend"]
-project-excludes = ["**/__pycache__", "**/.venv/**", "**/node_modules/**"]
+project-excludes = ["**/__pycache__", "**/.venv/**", "**/node_modules/**", "**/_pyrefly_virtual_/**", "**/__pyrefly_virtual__/**", "C:/_pyrefly_virtual_/**", "c:/_pyrefly_virtual_/**", "C:/__pyrefly_virtual__/**", "c:/__pyrefly_virtual__/**"]
 search-path = ["backend"]
 python-interpreter-path = ".venv/Scripts/python.exe"

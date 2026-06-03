@@ -129,6 +129,8 @@ const SuperAdminRedirect = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+let mountRefreshPromise: Promise<string | null> | null = null;
+
 function App() {
   const { login, logout, setLoading } = useAuthStore();
 
@@ -146,16 +148,31 @@ function App() {
         }
       }
 
-      if (!hasSavedSession) {
-        setLoading(false);
+      const hasCookie = document.cookie.split(';').some(item => item.trim().startsWith('has_refresh_token='));
+
+      if (!hasSavedSession || !hasCookie) {
+        if (hasSavedSession) {
+          logout();
+        } else {
+          setLoading(false);
+        }
         return;
       }
 
       setLoading(true);
       try {
-        // Attempt silent token refresh using the HTTP-only refresh_token cookie
-        const refreshRes = await apiClient.post('/auth/refresh');
-        const newAccessToken = refreshRes.data?.data?.access_token;
+        if (!mountRefreshPromise) {
+          mountRefreshPromise = (async () => {
+            try {
+              const refreshRes = await apiClient.post('/auth/refresh');
+              return refreshRes.data?.data?.access_token || null;
+            } catch {
+              return null;
+            }
+          })();
+        }
+
+        const newAccessToken = await mountRefreshPromise;
 
         if (newAccessToken) {
           // Set the new token on axios defaults for the /auth/me call
@@ -189,6 +206,11 @@ function App() {
       } catch {
         // Refresh failed (401 or network error) — session is invalid
         logout();
+      } finally {
+        // Clear promise after a delay to allow subsequent refreshes if needed
+        setTimeout(() => {
+          mountRefreshPromise = null;
+        }, 1000);
       }
     };
 

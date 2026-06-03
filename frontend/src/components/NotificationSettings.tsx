@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
-  Bell, Mail, Smartphone, MessageSquare, MessageCircle, CheckCircle2,
+  Bell, Mail, Smartphone, MessageCircle, CheckCircle2,
   Moon, Loader2, ExternalLink, Target, DollarSign, CheckSquare, ShieldAlert,
 } from 'lucide-react';
 import { toast } from 'sonner';

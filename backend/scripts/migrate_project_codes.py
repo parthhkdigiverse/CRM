@@ -46,6 +46,8 @@ async def migrate():
             print(f"Found {len(assigned_leads)} active assigned leads. Verifying project links...")
             
             for lead in assigned_leads:
+                if lead.assigned_to is None:
+                    continue
                 existing_proj = await Project.find_one(
                     Project.linked_lead_id == lead.id,
                     Project.org_id == org.id

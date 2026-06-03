@@ -23,9 +23,7 @@ class NotificationReadUpdate(BaseModel):
     is_read: Optional[bool] = None
 
 
-def _aware_utc(dt: Optional[datetime]) -> Optional[datetime]:
-    if dt is None:
-        return None
+def _aware_utc(dt: datetime) -> datetime:
     return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt.astimezone(timezone.utc)
 
 
@@ -76,7 +74,7 @@ async def list_notifications(
         return SuccessResponse(data=[])
 
     # Base query filter
-    query = {
+    query: dict = {
         "user_id": current_user.id,
         "is_deleted": {"$ne": True}
     }
@@ -107,7 +105,7 @@ async def list_notifications(
 @router.put("/mark-all-read", response_model=SuccessResponse)
 async def mark_all_read(current_user: User = Depends(get_current_user)):
     """Mark all active notifications for the current user as read."""
-    await Notification.find(
+    await Notification.find(  # type: ignore
         Notification.user_id == current_user.id,
         Notification.is_deleted == False,
         Notification.is_read == False
@@ -119,7 +117,7 @@ async def mark_all_read(current_user: User = Depends(get_current_user)):
 @router.put("/clear-all", response_model=SuccessResponse)
 async def clear_all(current_user: User = Depends(get_current_user)):
     """Soft-delete all active notifications for the current user."""
-    await Notification.find(
+    await Notification.find(  # type: ignore
         Notification.user_id == current_user.id,
         Notification.is_deleted == False
     ).update({"$set": {"is_deleted": True, "deleted_at": utc_now(), "deleted_by": current_user.id}})

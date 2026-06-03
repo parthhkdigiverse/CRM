@@ -3,10 +3,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { 
   CheckCircle, 
-  CalendarDays, 
   Target, 
   Clock,
-  ArrowUpRight,
   Loader2,
   CalendarCheck,
   Folder

@@ -246,7 +246,7 @@ async def update_global_overtime_rate(
         await org.save()
 
     # Bulk update all employees' overtime_rate
-    await Employee.find(org_filter(org, {"is_deleted": {"$ne": True}})).update(
+    await Employee.find(org_filter(org, {"is_deleted": {"$ne": True}})).update(  # type: ignore
         {"$set": {"overtime_rate": data.overtime_rate}}
     )
 

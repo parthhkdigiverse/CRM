@@ -76,9 +76,7 @@ async def sync_assigned_lead_project(lead: Lead, current_user: User, old_assigne
         Project.org_id == lead.org_id
     )
 
-    should_have_project = lead.assigned_to is not None
-
-    if not should_have_project:
+    if lead.assigned_to is None:
         # If it shouldn't have a project, soft-delete it if it exists
         if existing_project and not existing_project.is_deleted:
             existing_project.is_deleted = True
@@ -491,7 +489,7 @@ async def bulk_assign_leads(
     lead_ids = [PydanticObjectId(id) for id in data.lead_ids]
     assigned_to = PydanticObjectId(data.assigned_to)
     
-    await Lead.find(
+    await Lead.find(  # type: ignore
         org_filter(org, {"_id": {"$in": lead_ids}})
     ).update({"$set": {"assigned_to": assigned_to, "updated_at": utc_now(), "updated_by": current_user.id}})
 

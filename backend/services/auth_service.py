@@ -8,7 +8,7 @@ from typing import Tuple, List, Optional
 
 from beanie import PydanticObjectId
 import hashlib
-from jose import JWTError
+from jose import JWTError  # type: ignore
 
 from config import settings
 from models.user import User
@@ -32,9 +32,7 @@ from utils.helpers import utc_now
 logger = logging.getLogger(__name__)
 
 
-def _make_aware(dt: Optional[datetime]) -> Optional[datetime]:
-    if dt is None:
-        return None
+def _make_aware(dt: datetime) -> datetime:
     if dt.tzinfo is None:
         return dt.replace(tzinfo=timezone.utc)
     return dt
@@ -248,7 +246,7 @@ async def forgot_password(email: str) -> None:
     if not user:
         return  # Don't reveal whether email exists
 
-    from jose import jwt as jose_jwt
+    from jose import jwt as jose_jwt  # type: ignore
     token_payload = {
         "sub": str(user.id),
         "type": "password_reset",
@@ -270,7 +268,7 @@ async def forgot_password(email: str) -> None:
 
 async def reset_password(token: str, new_password: str) -> None:
     """Reset password using a valid reset token."""
-    from jose import jwt as jose_jwt
+    from jose import jwt as jose_jwt  # type: ignore
 
     try:
         payload = jose_jwt.decode(
@@ -317,7 +315,7 @@ async def change_password(user_id: str, current_password: str, new_password: str
     if not user:
         raise ValueError("User not found")
 
-    if not verify_password(current_password, user.hashed_password):
+    if not user.hashed_password or not verify_password(current_password, user.hashed_password):
         raise ValueError("Current password is incorrect")
 
     is_valid, error_msg = validate_password_strength(new_password)

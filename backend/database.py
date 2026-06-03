@@ -2,6 +2,7 @@
 Database initialization — Motor async client + Beanie ODM setup.
 """
 
+from typing import Optional
 from motor.motor_asyncio import AsyncIOMotorClient
 from beanie import init_beanie
 
@@ -34,7 +35,7 @@ from models.expense import Expense
 from models.overtime import Overtime
 from models.meta_integration import MetaIntegration
 
-_client: AsyncIOMotorClient = None
+_client: Optional[AsyncIOMotorClient] = None
 
 ALL_MODELS = [
     User,
@@ -73,7 +74,7 @@ async def init_db() -> None:
     global _client
     _client = AsyncIOMotorClient(settings.MONGODB_URL)
     database = _client[settings.MONGODB_DB_NAME]
-    await init_beanie(database=database, document_models=ALL_MODELS)
+    await init_beanie(database=database, document_models=ALL_MODELS)  # type: ignore
 
 
 async def close_db() -> None:

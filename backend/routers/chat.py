@@ -224,8 +224,11 @@ async def get_or_create_direct_room(target_user_id: PydanticObjectId, current_us
 
 @router.post("/rooms/group")
 async def create_group_room(body: CreateGroupRequest, current_user: User = Depends(get_current_user)):
-    pids = [PydanticObjectId(p) for p in body.participant_ids if p != str(current_user.id)]
-    pids.insert(0, current_user.id)
+    user_id = current_user.id
+    if user_id is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User ID is missing")
+    pids = [PydanticObjectId(p) for p in body.participant_ids if p != str(user_id)]
+    pids.insert(0, user_id)
     if len(pids) < 2:
         raise HTTPException(status_code=400, detail="A group needs at least 2 members")
 

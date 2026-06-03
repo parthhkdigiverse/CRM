@@ -75,7 +75,7 @@ async def _feature_value(current_user: User, module: str) -> bool | None:
         if not org:
             return None
         resolved = resolve_feature_access(getattr(org, "feature_access", {}) or {})
-        return bool(resolved.get(role, {}).get(feature_key, True))
+        return resolved.get(role, {}).get(feature_key, True)
     except Exception:
         return None
 
